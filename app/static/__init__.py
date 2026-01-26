@@ -1,0 +1,1 @@
+from app.static.simplify_air_france_flights import AirFranceAPI
