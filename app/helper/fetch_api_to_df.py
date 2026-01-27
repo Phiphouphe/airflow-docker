@@ -40,7 +40,9 @@ def fetch_api_to_df(
 
     # Transformer en DataFrame Pandas
     try:
-        df = pd.json_normalize(data_dict)
+        df = pd.json_normalize(data_dict,)
+        print(df.columns)  # quelles colonnes existent réellement ?
+        print(df.head())
         if transform_function:
             df = transform_function(df)
         logging.info(f"📊 DataFrame créé avec {df.shape[0]} lignes et {df.shape[1]} colonnes")

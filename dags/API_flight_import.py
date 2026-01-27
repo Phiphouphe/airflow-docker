@@ -12,7 +12,7 @@ import app.helper as helper
 
 from app.tasks.Extract.API_extraction import API_extraction
 from app.tasks.Transform.API_transform_data import API_transform_data
-from app.static.simplify_air_france_flights import AirFranceAPI
+from app.static.simplify_air_france_flights import simplify_flights
 from airflow.models import Variable
 
 # Importation de la clé API depuis les Variables Airflow
@@ -35,7 +35,7 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule="0 9,14,20 * * *",
+    schedule="0 8,14,20 * * *",
     tags=["API", "FLIGHT",],
     catchup=False,
     max_active_runs=1,
@@ -64,6 +64,15 @@ with DAG(
     task_transform_API_data = API_transform_data(
         input_parquet_file="task_export_API_flight",
         output_parquet_file="task_transform_API_data",
-        transform_function=AirFranceAPI.simplify_flights,
+        transform_function=simplify_flights,
         task_id="task_transform_API_data",
-    )   
+    )
+
+    
+
+
+
+
+
+    # Définition des dépendances entre les tâches
+    task_export_API_flight >> task_transform_API_data

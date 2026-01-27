@@ -43,7 +43,7 @@ class API_extraction(PythonOperator):
         super().__init__(
             task_id=task_id,
             python_callable=self._run,
-            # execute_timeout=execution_timeout,
+            execution_timeout=execution_timeout,
             **kwargs,
         )
 
@@ -60,6 +60,10 @@ class API_extraction(PythonOperator):
         except AirflowFailException as e:
             logging.error(f"❌ Erreur lors de l'extraction API : {e}")
             raise
+
+        # Voir les lignes
+        print(type(df))
+        print(df.head(5))
 
         # Retirer l'extension du fichier de sortie pour générer le nom de fichier temporaire
         file_name = self.output_file.rsplit(".", 1)[0]

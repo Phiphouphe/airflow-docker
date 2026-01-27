@@ -37,7 +37,7 @@ class API_transform_data(PythonOperator):
         super().__init__(
             task_id=task_id,
             python_callable=self._run,
-            # execute_timeout=execution_timeout,
+            execution_timeout=execution_timeout,
             **kwargs,
         )
 
@@ -46,6 +46,10 @@ class API_transform_data(PythonOperator):
         # Charger le parquet d'entrée
         df = helper.load_parquet_to_df(self.dag.dag_id, self.input_file, have_file_security=True)
 
+        # Voir les lignes avant transformation
+        print("Type après transformation", type(df))
+        print("Lignes après transformation", df.head(5))
+
         # Transformation des données (à partir de la fonction fournie)
         try:
             df = self.transform_function(df)
@@ -53,6 +57,11 @@ class API_transform_data(PythonOperator):
             logging.info(f"✅ Transformation appliquée avec succès.")
         except Exception as e:
             raise AirflowFailException(f"❌ Erreur lors de l'application de la transformation : {e}")
+        
+        # Voir les lignes après transformation
+        print("Type après transformation", type(df))
+        print("Lignes après transformation", df.head(5))
+        print("Colonnes après transformation", df.columns)
            
         # Sauvegarde du fichier (généralement vers un fichier temporaire)
         helper.generate_parquet_to_temp(
