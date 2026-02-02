@@ -12,6 +12,7 @@ import app.helper as helper
 
 from app.tasks.Extract.API_extraction import API_extraction
 from app.tasks.Transform.API_transform_data import API_transform_data
+from app.tasks.Load.Load_to_database import Load_to_database
 from app.static.simplify_air_france_flights import simplify_flights
 from airflow.models import Variable
 
@@ -68,6 +69,12 @@ with DAG(
         task_id="task_transform_API_data",
     )
 
+    task_load_API_data_to_db = Load_to_database(
+        table_name="flights_db",
+        input_parquet_file="task_transform_API_data",
+        task_id="task_load_API_data_to_db",
+    )
+
     
 
 
@@ -75,4 +82,4 @@ with DAG(
 
 
     # Définition des dépendances entre les tâches
-    task_export_API_flight >> task_transform_API_data
+    task_export_API_flight >> task_transform_API_data >> task_load_API_data_to_db

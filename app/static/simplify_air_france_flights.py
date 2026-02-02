@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from airflow.exceptions import AirflowFailException
 
@@ -33,5 +34,16 @@ def simplify_flights(df: pd.DataFrame) -> pd.DataFrame:
             "owner_airline": leg["aircraft"].get("ownerAirlineName"),
             "wifi_enabled": leg["aircraft"].get("wifiEnabled"),
         })
+
+    for f in simplified_flights:
+        dc = f["delay_code"]
+        if dc is None:
+            f["delay_code"] = '{}'
+        elif isinstance(dc, list) or isinstance(dc, pd.Series) or isinstance(dc, pd.Index) or isinstance(dc, np.ndarray):
+            f["delay_code"] = '{' + ','.join(map(str, dc)) + '}'
+        elif isinstance(dc, str):
+            f["delay_code"] = '{' + dc + '}'
+        else:
+            f["delay_code"] = '{' + str(dc) + '}'
 
     return pd.DataFrame(simplified_flights)
