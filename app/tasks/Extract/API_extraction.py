@@ -1,13 +1,12 @@
 import logging
-import requests
-import pandas as pd
 
-from datetime import datetime, timedelta
+import app.helper as helper
+
+from datetime import timedelta
 
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
 
-import app.helper as helper
 
 class API_extraction(PythonOperator):
 
@@ -20,7 +19,7 @@ class API_extraction(PythonOperator):
         transform_function: callable = None,
         execution_timeout: timedelta = timedelta(seconds=30),
         task_id: str = "API_extraction",
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Extrait des données depuis une API externe et génère un fichier temporaire au format CSV ou Parquet.
@@ -61,12 +60,9 @@ class API_extraction(PythonOperator):
             logging.error(f"❌ Erreur lors de l'extraction API : {e}")
             raise
 
-        # Voir les lignes
-        print(type(df))
-        print(df.head(5))
-
         # Retirer l'extension du fichier de sortie pour générer le nom de fichier temporaire
         file_name = self.output_file.rsplit(".", 1)[0]
+        logging.info(f"Nom du fichier temporaire généré : {file_name}")
 
         # Sauvegarde du fichier (généralement vers un fichier temporaire)
         helper.generate_parquet_to_temp(
