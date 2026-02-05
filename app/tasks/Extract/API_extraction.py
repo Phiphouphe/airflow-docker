@@ -33,11 +33,11 @@ class API_extraction(PythonOperator):
         - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "API_extraction".
         """
-        self.url_api = url_api
-        self.headers = headers
-        self.api_params = api_params
-        self.transform_function = transform_function
-        self.output_file = output_parquet_file
+        self._url_api = url_api
+        self._headers = headers
+        self._api_params = api_params
+        self._transform_function = transform_function
+        self._output_file = output_parquet_file
         
         super().__init__(
             task_id=task_id,
@@ -46,22 +46,35 @@ class API_extraction(PythonOperator):
             **kwargs,
         )
 
-    def _run(self):
+    def _run(self, **context):
+            
+        # 1. Récupère la date logique du run
+        execution_date = context['execution_date']
+
+        # 2. Récupère le créneau horaire (8, 14, 20) depuis les paramètres de la task
+        hour = self._api_params.pop("schedule_hour")
+
+        # 3. Calcule le début et la fin du créneau en fonction du jour du run
+        startRange, endRange = self.get_api_time_range(hour, execution_date)
+
+        # 4. Mets ces valeurs dans api_params pour l'appel à l'API
+        self._api_params["startRange"] = startRange
+        self._api_params["endRange"] = endRange
 
         # Extraction des données via l'API
         try:
             df = helper.fetch_api_to_df(
-                url_api=self.url_api,
-                headers=self.headers,
-                params=self.api_params,
-                transform_function=self.transform_function
+                url_api=self._url_api,
+                headers=self._headers,
+                params=self._api_params,
+                transform_function=self._transform_function
             )
         except AirflowFailException as e:
             logging.error(f"❌ Erreur lors de l'extraction API : {e}")
             raise
 
         # Retirer l'extension du fichier de sortie pour générer le nom de fichier temporaire
-        file_name = self.output_file.rsplit(".", 1)[0]
+        file_name = self._output_file.rsplit(".", 1)[0]
         logging.info(f"Nom du fichier temporaire généré : {file_name}")
 
         # Sauvegarde du fichier (généralement vers un fichier temporaire)
@@ -70,3 +83,20 @@ class API_extraction(PythonOperator):
             df,
             file_name,
         )
+
+    def get_api_time_range(self, schedule_hour, execution_date):
+        base_date = execution_date.start_of('day')
+
+        if schedule_hour == 8:
+            start = base_date.add(hours=8)
+            end = base_date.add(hours=13, minutes=59, seconds=59)
+        elif schedule_hour == 14:
+            start = base_date.add(hours=14)
+            end = base_date.add(hours=19, minutes=59, seconds=59)
+        elif schedule_hour == 20:
+            start = base_date.add(hours=20)
+            end = base_date.add(days=1, hours=7, minutes=59, seconds=59)
+        else:
+            raise ValueError("Schedule hour non supporté")
+
+        return start.to_iso8601_string(), end.to_iso8601_string()

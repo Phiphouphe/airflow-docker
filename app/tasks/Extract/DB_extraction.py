@@ -15,8 +15,9 @@ class DB_extraction(PythonOperator):
     def __init__(
             self,
             table_name: str,
+            schema_name: str,
             output_parquet_file: str,
-            database_conn_id: str = "postgres_api",
+            database_conn_id: str = "flight_dw_postgres",
             columns: list[str] | str = "*",   
             where_clause: str | None = None,          
             limit_clause: int | None = None,         
@@ -27,8 +28,10 @@ class DB_extraction(PythonOperator):
         ):
         """
         Extrait des données depuis une base de données PostgreSQL et génère un fichier temporaire au format Parquet.
+        
         Arguments :
         - table_name (str) : Nom de la table PostgreSQL source.
+        - schema_name (str) : Nom du schéma PostgreSQL source.
         - output_parquet_file (str) : Nom du fichier de sortie.
         - database_conn_id (str, optionnel) : Identifiant de connexion Airflow pour la base de données PostgreSQL. Par défaut "postgres_api".
         - columns (list[str] | str, optionnel) : Colonnes à sélectionner. Par défaut "*".
@@ -40,6 +43,7 @@ class DB_extraction(PythonOperator):
         """
 
         self._table_name = table_name
+        self._schema_name = schema_name
         self._output_parquet_file = output_parquet_file
         self._db_conn_id = database_conn_id
         self._columns = columns
@@ -66,8 +70,8 @@ class DB_extraction(PythonOperator):
         # Extraction des données depuis la base de données
         try:
             df = pd.read_sql(query, engine)
-        except Exception:
-            logging.exception("Erreur lors de l'extraction depuis la base de données")
+        except Exception as e:
+            logging.error(f"Erreur lors de l'extraction depuis la base de données : {e}")
             raise AirflowFailException("Erreur lors de l'extraction depuis la base de données")
 
         # Debug: vérifier les colonnes et un aperçu des données
@@ -96,7 +100,7 @@ class DB_extraction(PythonOperator):
         else:
             columns_part = self._columns.strip()
         
-        query = f"SELECT {columns_part} FROM {self._table_name}"
+        query = f"SELECT {columns_part} FROM {self._schema_name}.{self._table_name}"
 
         if self._where_clause:
             query += f" WHERE {self._where_clause}"

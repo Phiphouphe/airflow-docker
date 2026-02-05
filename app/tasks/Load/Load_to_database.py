@@ -17,8 +17,9 @@ class Load_to_database(PythonOperator):
     def __init__(
         self,
         table_name: str,
+        schema_name: str,
         input_parquet_file: str,
-        database_conn_id: str = "postgres_api",
+        database_conn_id: str = "flight_dw_postgres",
         if_exists: str = "append",
         have_chunksize: int = 1000,
         execution_timeout: timedelta = timedelta(minutes=5),
@@ -30,6 +31,7 @@ class Load_to_database(PythonOperator):
 
         Arguments :
         - table_name (str) : Nom de la table PostgreSQL cible.
+        - schema_name (str) : Nom du schéma PostgreSQL cible.
         - input_parquet_file (str) : Chemin du fichier Parquet source.
         - database_conn_id (str, optionnel) : Identifiant de connexion Airflow pour la base de données PostgreSQL. Par défaut "postgres_api".
         - if_exists (str, optionnel) : Comportement si la table existe déjà ("fail", "replace", "append"). Par défaut "append".
@@ -38,6 +40,7 @@ class Load_to_database(PythonOperator):
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "Load_to_database".
         """
         self._table_name = table_name
+        self._schema_name = schema_name
         self._input_file = input_parquet_file
         self._db_conn_id = database_conn_id
         self._if_exists = if_exists
@@ -77,6 +80,7 @@ class Load_to_database(PythonOperator):
             df.to_sql(
                 self._table_name, 
                 engine, 
+                self._schema_name,
                 if_exists=self._if_exists, 
                 index=False,
                 method="multi",

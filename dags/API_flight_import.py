@@ -23,7 +23,7 @@ API_KEY = Variable.get("AIRFRANCE_API_KEY")
 # Définition du DAG
 DAG_ID = "API_flight_import"
 LIBELLE = "Import des datas vol via API"
-DESCRIPTION = "Import des données de vol depuis une API externe vers la base de données A2PO."
+DESCRIPTION = "Import des données de vol depuis une API externe vers la base de données flight_dw."
 
 
 default_args = {
@@ -44,11 +44,11 @@ with DAG(
     dagrun_timeout=timedelta(minutes=15),
     description=DESCRIPTION,
     doc_md="""
-            Import des données de vol depuis une API externe vers la base de données A2PO.
+            Import des données de vol depuis une API externe vers la base de données flight_dw.
         """
 ) as dag:
 
-    task_export_API_flight = API_extraction(
+    task_extract_API_flight = API_extraction(
         url_api="https://api.airfranceklm.com/opendata/flightstatus",
         headers={"API-Key": API_KEY},
         api_params={"endRange": "2025-12-03T23:59:59.000Z",
@@ -59,27 +59,29 @@ with DAG(
                 "movementType": "A",
                 "origin": "NCE",
                 },
-        output_parquet_file="task_export_API_flight",
-        task_id="task_export_API_flight",
+        output_parquet_file="task_extract_API_flight",
+        task_id="task_extract_API_flight",
     )
 
     task_transform_API_data = API_transform_data(
-        input_parquet_file="task_export_API_flight",
+        input_parquet_file="task_extract_API_flight",
         output_parquet_file="task_transform_API_data",
         transform_function=simplify_flights,
         task_id="task_transform_API_data",
     )
 
     task_load_API_data_to_db = Load_to_database(
-        table_name="flights_db",
+        table_name="air_france_flights",
+        schema_name="raw",
         input_parquet_file="task_transform_API_data",
-        database_conn_id="postgres_api",
+        database_conn_id="flight_dw_postgres",
         if_exists="append",
         task_id="task_load_API_data_to_db",
     )
 
     task_test_database_extraction = DB_extraction(
-        table_name="flights_db",
+        table_name="air_france_flights",
+        schema_name="raw",
         output_parquet_file="task_test_database_extraction",
         columns = [
             "flight_id",
@@ -112,4 +114,4 @@ with DAG(
 
 
     # Définition des dépendances entre les tâches
-    task_export_API_flight >> task_transform_API_data >> task_load_API_data_to_db >> task_test_database_extraction
+    task_extract_API_flight >> task_transform_API_data >> task_load_API_data_to_db >> task_test_database_extraction
