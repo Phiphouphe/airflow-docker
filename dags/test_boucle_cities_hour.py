@@ -37,19 +37,28 @@ with DAG(
     start_date=datetime(2025, 12, 3),
     schedule="0 8,14,20 * * *",
     catchup=False,
-    max_active_runs=1
+    max_active_runs=1,
+    params={"target_hour": None}  # Paramètre pour le trigger manuel
 ) as dag:
-
+    
+    # Déterminer l'heure à exécuter
+    # - Lors d'une exécution scheduleée: utiliser l'heure de execution_date
+    # - Lors d'un trigger manuel: utiliser le paramètre target_hour ou l'heure programmée la plus proche
+    
+    # Créer les TaskGroups seulement pour les heures programmées
     for hour in schedule_hours:
         with TaskGroup(group_id=f"time_slot_{hour}") as tg:
-            for origin in origins:
-                API_extraction(
+            for index, origin in enumerate(origins):
+                api_task = API_extraction(
                     task_id=f"extract_{origin}_{hour}",
                     url_api="https://api.airfranceklm.com/opendata/flightstatus",
                     headers={"API-Key": API_KEY},
                     api_params={"origin": origin, "schedule_hour": hour, "destination": "CDG",
                                 "carrierCode": "AF", "operatingAirlineCode": "AF", "movementType": "A"},
-                    output_parquet_file=f"/opt/airflow/data/extract_{origin}_{hour}.parquet",
-                    op_kwargs={"execution_date": "{{ execution_date }}"}  # ← passe la date du run
+                    output_parquet_file=f"test_extract_{origin}_{hour}",
+                    delay_seconds=index * 10,
                 )
+                
+                # Ajouter une dépendance conditionnelle (optionnel, pour plus tard)
+              
     

@@ -1,12 +1,10 @@
 import logging
-
-import app.helper as helper
-
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
 
+import app.helper as helper
 
 class API_extraction(PythonOperator):
 
@@ -17,12 +15,13 @@ class API_extraction(PythonOperator):
         api_params: dict,
         output_parquet_file : str,
         transform_function: callable = None,
-        execution_timeout: timedelta = timedelta(seconds=30),
+        flight_mode: str = "scheduled",
+        execution_timeout: timedelta = timedelta(seconds=60),
         task_id: str = "API_extraction",
-        **kwargs,
+        **kwargs
     ) -> None:
         """
-        Extrait des données depuis une API externe et génère un fichier temporaire au format CSV ou Parquet.
+        Extrait des données depuis une API externe et génère un fichier temporaire au format Parquet.
 
         Arguments :
         - url_api (str) : URL de l’API à interroger.
@@ -30,7 +29,8 @@ class API_extraction(PythonOperator):
         - api_params (dict) : Paramètres de requête envoyés à l’API.
         - output_parquet_file (str) : Nom du fichier de sortie.
         - transform_function (callable, optionnel) : Fonction appliquée aux données brutes avant conversion en DataFrame. Par défaut None.
-        - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
+        - flight_mode (str, optionnel) : Mode de vol pour définir les plages de temps de l'API. "scheduled" pour les vols du jour même, "raw" pour les vols du jour précédent. Par défaut "scheduled".
+        - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 60 secondes.
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "API_extraction".
         """
         self._url_api = url_api
@@ -38,6 +38,7 @@ class API_extraction(PythonOperator):
         self._api_params = api_params
         self._transform_function = transform_function
         self._output_file = output_parquet_file
+        self._flight_mode = flight_mode
         
         super().__init__(
             task_id=task_id,
@@ -47,19 +48,21 @@ class API_extraction(PythonOperator):
         )
 
     def _run(self, **context):
-            
-        # 1. Récupère la date logique du run
-        execution_date = context['execution_date']
 
-        # 2. Récupère le créneau horaire (8, 14, 20) depuis les paramètres de la task
-        hour = self._api_params.pop("schedule_hour")
-
-        # 3. Calcule le début et la fin du créneau en fonction du jour du run
-        startRange, endRange = self.get_api_time_range(hour, execution_date)
-
-        # 4. Mets ces valeurs dans api_params pour l'appel à l'API
-        self._api_params["startRange"] = startRange
-        self._api_params["endRange"] = endRange
+        # Récupération de la date d'exécution pour définir les plages de temps de l'API
+        logical_date = context['logical_date']
+        
+        # Si flight_mode = raw, récupérer J-1, sinon J
+        if self._flight_mode == "raw":
+            date_ref = logical_date - timedelta(days=1)
+        else:
+            date_ref = logical_date
+        
+        start = date_ref.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = date_ref.replace(hour=23, minute=59, second=59, microsecond=0)
+        
+        self._api_params["startRange"] = start.isoformat()
+        self._api_params["endRange"] = end.isoformat()
 
         # Extraction des données via l'API
         try:
@@ -75,7 +78,6 @@ class API_extraction(PythonOperator):
 
         # Retirer l'extension du fichier de sortie pour générer le nom de fichier temporaire
         file_name = self._output_file.rsplit(".", 1)[0]
-        logging.info(f"Nom du fichier temporaire généré : {file_name}")
 
         # Sauvegarde du fichier (généralement vers un fichier temporaire)
         helper.generate_parquet_to_temp(
@@ -83,20 +85,3 @@ class API_extraction(PythonOperator):
             df,
             file_name,
         )
-
-    def get_api_time_range(self, schedule_hour, execution_date):
-        base_date = execution_date.start_of('day')
-
-        if schedule_hour == 8:
-            start = base_date.add(hours=8)
-            end = base_date.add(hours=13, minutes=59, seconds=59)
-        elif schedule_hour == 14:
-            start = base_date.add(hours=14)
-            end = base_date.add(hours=19, minutes=59, seconds=59)
-        elif schedule_hour == 20:
-            start = base_date.add(hours=20)
-            end = base_date.add(days=1, hours=7, minutes=59, seconds=59)
-        else:
-            raise ValueError("Schedule hour non supporté")
-
-        return start.to_iso8601_string(), end.to_iso8601_string()

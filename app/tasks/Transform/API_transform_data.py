@@ -47,8 +47,8 @@ class API_transform_data(PythonOperator):
         df = helper.load_parquet_to_df(self.dag.dag_id, self.input_file, have_file_security=True)
 
         # Voir les lignes avant transformation
-        print("Type après transformation", type(df))
-        print("Lignes après transformation", df.head(5))
+        print("Type avant transformation", type(df))
+        print("Lignes avant transformation", df.head(5))
 
         # Transformation des données (à partir de la fonction fournie)
         try:
