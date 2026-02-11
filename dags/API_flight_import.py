@@ -14,7 +14,8 @@ from app.tasks.Extract.API_extraction import API_extraction
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.Transform.API_transform_data import API_transform_data
 from app.tasks.Transform.Merge_files import Merge_files
-from app.tasks.Transform.Filter_flights import Filter_flights
+from app.tasks.Transform.Filter_raw_flights import Filter_raw_flights
+from app.tasks.Transform.Filter_scheduled_flights import Filter_scheduled_flights
 from app.tasks.Load.Load_to_database import Load_to_database
 from app.static.simplify_air_france_flights import simplify_flights
 from airflow.models import Variable
@@ -50,6 +51,7 @@ with DAG(
         """
 ) as dag:
 
+    # Extraction des données du vol de la veille (raw)
     task_extract_API_raw_flight = API_extraction(
         url_api="https://api.airfranceklm.com/opendata/flightstatus",
         headers={"API-Key": API_KEY},
@@ -65,6 +67,7 @@ with DAG(
         task_id="task_extract_API_raw_flight",
     )
 
+    # Extraction des données de vol du jour même (scheduled)
     task_extract_API_scheduled_flight = API_extraction(
         url_api="https://api.airfranceklm.com/opendata/flightstatus",
         headers={"API-Key": API_KEY},
@@ -80,31 +83,47 @@ with DAG(
         task_id="task_extract_API_scheduled_flight",
     )
 
-    task_merge_flights = Merge_files(
-        input_parquet_file_1="task_extract_API_raw_flight",
-        input_parquet_file_2="task_extract_API_scheduled_flight",
-        output_parquet_file="task_merge_flights",
-        task_id="task_merge_flights",
-    )
-
-    task_transform_API_data = API_transform_data(
-        input_parquet_file="task_merge_flights",
-        output_parquet_file="task_transform_API_data",
+    # Transformation des données extraites de l'API pour les deux fichiers (raw et scheduled)
+    task_transform_raw_flights = API_transform_data(
+        input_parquet_file="task_extract_API_raw_flight",
+        output_parquet_file="task_transform_raw_flights",
         transform_function=simplify_flights,
-        task_id="task_transform_API_data",
+        task_id="task_transform_raw_flights",
     )
 
-    task_filter_flights = Filter_flights(
-        input_parquet_file="task_transform_API_data",
-        output_parquet_file_raw="task_filter_raw_flights",
-        output_parquet_file_scheduled="task_filter_scheduled_flights",
-        task_id="task_filter_flights",
+    task_transform_scheduled_flights = API_transform_data(
+        input_parquet_file="task_extract_API_scheduled_flight",
+        output_parquet_file="task_transform_scheduled_flights",
+        transform_function=simplify_flights,
+        task_id="task_transform_scheduled_flights",
+    )
+
+    # Filtrage des vols du jour même qui sont déjà arrivés pour les charger dans la table de raw
+    task_filter_raw_flights = Filter_raw_flights(
+        input_parquet_file="task_transform_scheduled_flights",
+        output_parquet_file="task_filter_raw_flights",
+        task_id="task_filter_raw_flights",
+    )
+
+    # Filtrage des vols du jour même qui ne sont pas encore arrivés pour les charger dans la table de staging
+    task_filter_scheduled_flights = Filter_scheduled_flights(
+        input_parquet_file="task_transform_scheduled_flights",
+        output_parquet_file="task_filter_scheduled_flights",
+        task_id="task_filter_scheduled_flights",
+    )
+
+    # Fusion des vols de la veille (raw) et des vols du jour même déjà arrivés (filtered raw) pour les charger dans la table de raw
+    task_merge_raw_files = Merge_files(
+        input_parquet_file_1="task_filter_raw_flights",
+        input_parquet_file_2="task_transform_raw_flights",
+        output_parquet_file="task_merge_raw_files",
+        task_id="task_merge_raw_files",
     )
 
     task_load_raw_to_db = Load_to_database(
         table_name="raw_flights",
         schema_name="raw",
-        input_parquet_file="task_filter_raw_flights",
+        input_parquet_file="task_merge_raw_files",
         database_conn_id="flight_dw_postgres",
         if_exists="append",
         task_id="task_load_raw_to_db",
@@ -154,4 +173,8 @@ with DAG(
 
 
     # Définition des dépendances entre les tâches
-    task_extract_API_raw_flight >> task_extract_API_scheduled_flight >> task_merge_flights >> task_transform_API_data >> task_filter_flights >> [task_load_raw_to_db, task_load_scheduled_to_db]
+    # Les données de vol "raw" et "scheduled" suivent des chemins parallèles d'extraction, de transformation et de chargement.
+    task_extract_API_raw_flight >> task_extract_API_scheduled_flight
+
+    task_extract_API_raw_flight >> task_transform_raw_flights >> task_filter_raw_flights >> task_merge_raw_files >> task_load_raw_to_db
+    task_extract_API_scheduled_flight >> task_transform_scheduled_flights >> task_filter_scheduled_flights >> task_load_scheduled_to_db

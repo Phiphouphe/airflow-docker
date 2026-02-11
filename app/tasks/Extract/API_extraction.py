@@ -64,6 +64,9 @@ class API_extraction(PythonOperator):
         self._api_params["startRange"] = start.isoformat()
         self._api_params["endRange"] = end.isoformat()
 
+        # Affichage pour debug
+        print(f"startRange: {self._api_params['startRange']}, endRange: {self._api_params['endRange']}")
+
         # Extraction des données via l'API
         try:
             df = helper.fetch_api_to_df(
