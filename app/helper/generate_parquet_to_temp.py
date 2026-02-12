@@ -39,20 +39,18 @@ def generate_parquet_to_temp(
 
     # Sauvegarder le DataFrame dans le format spécifié
     if data.empty:
-        logging.warning(f"⚠️ Le DataFrame est vide. Le fichier {file_path} a été créé mais ne contient pas de données.")
+        if empty_security:
+            raise AirflowFailException(f"❌ Le fichier {file_name} est vide et empty_security=True.")
+        logging.info(f"ℹ️ Le DataFrame est vide. Un fichier Parquet vide sera créé : {file_path}")
+        pd.DataFrame().to_parquet(file_path, index=False)  # créer fichier vide
     else:
         num_rows, num_cols = data.shape
         logging.info(f"📊 Le DataFrame contient {num_rows} lignes et {num_cols} colonnes.")
-
         try:
             data.to_parquet(file_path, index=False)
             logging.info(f"✅ Fichier Parquet sauvegardé : {file_path}")
         except Exception as e:
             raise AirflowFailException(f"❌ Erreur lors de la sauvegarde du fichier {file_path}: {e}")
-
-    # Vérification de la sécurité pour les fichiers vides
-    if empty_security and data.empty:
-        raise AirflowFailException(f"❌ Le fichier {file_name} est vide.")
 
     return file_path
 

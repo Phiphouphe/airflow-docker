@@ -51,6 +51,7 @@ class Merge_files(PythonOperator):
 
         # Fusionner les deux DataFrames
         df_merged = pd.concat([df_1, df_2], ignore_index=True)
+        print("Extrait des premières lignes: ", df_merged.head())
 
         logging.info(f"✅ Fusion : {len(df_merged)} lignes au total")
 

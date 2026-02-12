@@ -62,4 +62,5 @@ class Filter_scheduled_flights(PythonOperator):
             self.dag.dag_id,
             df_filter,
             self._output_file,
+            empty_security=False,
         )

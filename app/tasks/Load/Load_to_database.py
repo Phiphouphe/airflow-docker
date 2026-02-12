@@ -67,30 +67,6 @@ class Load_to_database(PythonOperator):
         # Récupérer le moteur de connexion à la base de données
         engine = ConnectorDb.get_db_engine(self._db_conn_id)
 
-        # Créer les colonnes techniques si elles n'existent pas
-        # now_utc = pendulum.now("UTC").naive()  # Converti en datetime standard
-        # df['created_date'] = now_utc
-        # df['updated_date'] = now_utc
-
-        # Maintenant en Europe/Paris
-        # now_paris = pendulum.now("Europe/Paris")
-        # df['created_date'] = pd.to_datetime(now_paris.to_iso8601_string())
-        # df['updated_date'] = pd.to_datetime(now_paris.to_iso8601_string())
-
-        now_paris = pendulum.now("Europe/Paris")
-
-        # Convertir en datetime avec fuseau aware
-        # Convertir en datetime Python standard (aware) pour Pandas
-        now_paris_dt = now_paris.in_timezone("Europe/Paris").naive()  # datetime naive en Europe/Paris
-
-        # Ensuite, tz_localize dans Pandas
-        now_paris = pd.Timestamp(now_paris_dt).tz_localize("Europe/Paris")
-        df['created_date'] = now_paris
-        df['updated_date'] = now_paris
-
-        df['week_photo'] = df['created_date'].apply(lambda x: pendulum.instance(x).week_of_year)
-        df['year_photo'] = df['created_date'].apply(lambda x: pendulum.instance(x).year)
-
         # Charger les données dans la table PostgreSQL
         try:
             df.to_sql(

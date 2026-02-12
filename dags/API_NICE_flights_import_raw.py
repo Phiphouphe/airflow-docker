@@ -16,7 +16,9 @@ from app.tasks.Transform.API_transform_data import API_transform_data
 from app.tasks.Transform.Merge_files import Merge_files
 from app.tasks.Transform.Filter_raw_flights import Filter_raw_flights
 from app.tasks.Transform.Filter_scheduled_flights import Filter_scheduled_flights
+from app.tasks.Transform.Parquet_add_technical_info import Parquet_add_technical_info
 from app.tasks.Load.Load_to_database import Load_to_database
+from app.tasks.Load.Parquet_to_snapshot import Parquet_to_snapshot
 from app.static.simplify_air_france_flights import simplify_flights
 from airflow.models import Variable
 
@@ -24,9 +26,9 @@ from airflow.models import Variable
 API_KEY = Variable.get("AIRFRANCE_API_KEY")
 
 # Définition du DAG
-DAG_ID = "API_flight_import"
-LIBELLE = "Import des datas vol via API"
-DESCRIPTION = "Import des données de vol depuis une API externe vers la base de données flight_dw."
+DAG_ID = "API_NICE_flights_import_raw"
+LIBELLE = "Import des datas vol pour les étapes Raw et Staging via API"
+DESCRIPTION = "Import des données de vol en partance de NICE depuis une API externe (Air France) vers la base de données flight_dw."
 
 
 default_args = {
@@ -41,13 +43,13 @@ with DAG(
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
     schedule="0 8 * * *",
-    tags=["API", "FLIGHT",],
+    tags=["API", "FLIGHT", "IMPORT", "RAW"],
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(minutes=15),
     description=DESCRIPTION,
     doc_md="""
-            Import des données de vol du jour et de la veille depuis une API externe vers la base de données flight_dw.
+            Import des données de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis une API externe vers la base de données flight_dw.
         """
 ) as dag:
 
@@ -83,7 +85,7 @@ with DAG(
         task_id="task_extract_API_scheduled_flight",
     )
 
-    # Transformation des données extraites de l'API pour les deux fichiers (raw et scheduled)
+    # Transformation des données extraites de l'API pour le fichier raw (vols de la veille)
     task_transform_raw_flights = API_transform_data(
         input_parquet_file="task_extract_API_raw_flight",
         output_parquet_file="task_transform_raw_flights",
@@ -91,6 +93,7 @@ with DAG(
         task_id="task_transform_raw_flights",
     )
 
+    # Transformation des données extraites de l'API pour le fichier scheduled (vols du jour même)
     task_transform_scheduled_flights = API_transform_data(
         input_parquet_file="task_extract_API_scheduled_flight",
         output_parquet_file="task_transform_scheduled_flights",
@@ -120,55 +123,37 @@ with DAG(
         task_id="task_merge_raw_files",
     )
 
-    task_load_raw_to_db = Load_to_database(
+    # Ajout des informations techniques pour le fichier raw
+    task_add_technical_info_raw = Parquet_add_technical_info(
+        input_parquet_file="task_merge_raw_files", 
+        output_parquet_file="task_add_technical_info_raw",
+        task_id="task_add_technical_info_raw", 
+    )
+
+    # Ajout des informations techniques pour le fichier scheduled
+    task_add_technical_info_scheduled = Parquet_add_technical_info(
+        input_parquet_file="task_filter_scheduled_flights", 
+        output_parquet_file="task_add_technical_info_scheduled", 
+        task_id="task_add_technical_info_scheduled", 
+    )
+
+    # Chargement du fichier raw dans la table raw_flights                                                  
+    task_load_raw_to_db = Parquet_to_snapshot(
         table_name="raw_flights",
-        schema_name="raw",
-        input_parquet_file="task_merge_raw_files",
+        schema="raw",
+        input_parquet_file="task_add_technical_info_raw",
         database_conn_id="flight_dw_postgres",
-        if_exists="append",
         task_id="task_load_raw_to_db",
     )
 
-    task_load_scheduled_to_db = Load_to_database(
-        table_name="stg_scheduled_flights",
-        schema_name="staging",
-        input_parquet_file="task_filter_scheduled_flights",
+    # Chargement du fichier scheduled dans la table raw_scheduled_flights
+    task_load_scheduled_to_db = Parquet_to_snapshot(
+        table_name="raw_scheduled_flights",
+        schema="raw",
+        input_parquet_file="task_add_technical_info_scheduled",
         database_conn_id="flight_dw_postgres",
-        if_exists="append",
         task_id="task_load_scheduled_to_db",
     )
-
-    # task_test_database_extraction = DB_extraction(
-    #     table_name="raw_flights",
-    #     schema_name="raw",
-    #     output_parquet_file="task_test_database_extraction",
-    #     columns = [
-    #         "flight_id",
-    #         "flight_number",
-    #         "airline_code",
-    #         "date",
-    #         "scheduled_departure",
-    #         "actual_departure",
-    #         "scheduled_arrival",
-    #         "actual_arrival",
-    #         "origin_airport",
-    #         "destination_airport",
-    #         "status",
-    #         "delay_minutes",
-    #         "delay_code",
-    #         "registration",
-    #         "type_code",
-    #         "type_name",
-    #         "owner_airline",
-    #         "wifi_enabled",
-    #         "created_date",
-    #         "updated_date",
-    #         "week_photo",
-    #         "year_photo",
-    #         ],
-    #     limit_clause=5,
-    #     task_id="task_test_database_extraction",
-    # )
 
 
 
@@ -176,5 +161,5 @@ with DAG(
     # Les données de vol "raw" et "scheduled" suivent des chemins parallèles d'extraction, de transformation et de chargement.
     task_extract_API_raw_flight >> task_extract_API_scheduled_flight
 
-    task_extract_API_raw_flight >> task_transform_raw_flights >> task_filter_raw_flights >> task_merge_raw_files >> task_load_raw_to_db
-    task_extract_API_scheduled_flight >> task_transform_scheduled_flights >> task_filter_scheduled_flights >> task_load_scheduled_to_db
+    task_extract_API_raw_flight >> task_transform_raw_flights >> task_transform_scheduled_flights >> task_filter_raw_flights >> task_merge_raw_files >> task_add_technical_info_raw >> task_load_raw_to_db
+    task_extract_API_scheduled_flight >> task_transform_scheduled_flights >> task_filter_scheduled_flights >> task_add_technical_info_scheduled >> task_load_scheduled_to_db

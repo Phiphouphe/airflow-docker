@@ -2,3 +2,4 @@ from app.tasks.Transform.API_transform_data import API_transform_data
 from app.tasks.Transform.Filter_scheduled_flights import Filter_scheduled_flights
 from app.tasks.Transform.Filter_raw_flights import Filter_raw_flights
 from app.tasks.Transform.Merge_files import Merge_files
+from app.tasks.Transform.Parquet_add_technical_info import Parquet_add_technical_info

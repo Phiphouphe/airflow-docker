@@ -51,6 +51,7 @@ class API_extraction(PythonOperator):
 
         # Récupération de la date d'exécution pour définir les plages de temps de l'API
         logical_date = context['logical_date']
+        logging.info(f"logical_date: {logical_date}")
         
         # Si flight_mode = raw, récupérer J-1, sinon J
         if self._flight_mode == "raw":
