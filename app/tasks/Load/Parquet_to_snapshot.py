@@ -43,12 +43,9 @@ class Parquet_to_snapshot(PythonOperator):
         self._chunksize = chunksize
         self._schema = schema
         self._db_conn_id = database_conn_id
-
-        # Créer l'engine ici une seule fois
-        self._engine = ConnectorDb.get_db_engine(self._db_conn_id)
-
+        
         # Générer le Dataset Airflow pour les outlets
-        outlets = [helper.get_postgres_dataset(self._engine, self._table_name, self._schema)]
+        outlets = [helper.get_postgres_dataset(self._db_conn_id, self._table_name, self._schema)]
         
         super().__init__(
             task_id=task_id,
@@ -69,6 +66,9 @@ class Parquet_to_snapshot(PythonOperator):
             logging.info(f"ℹ️ Le fichier {self._input_parquet_file} est vide pour {self._table_name.upper()}, rien à insérer. La task est considérée comme réussie.")
             return
 
+        # Créer l'engine ici une seule fois
+        engine = ConnectorDb.get_db_engine(self._db_conn_id)
+
         # Vérifier colonne DATE_PHOTO
         if 'DATE_PHOTO' not in df.columns:
             raise ValueError("❌ La colonne 'DATE_PHOTO' est requise dans le Parquet")
@@ -80,8 +80,8 @@ class Parquet_to_snapshot(PythonOperator):
             raise ValueError("❌ Le Parquet doit contenir une seule valeur unique pour DATE_PHOTO")
         date_photo = unique_dates[0]
 
-        with self._engine.begin() as conn:
-            inspector = inspect(self._engine)
+        with engine.begin() as conn:
+            inspector = inspect(engine)
             tables = inspector.get_table_names(schema=self._schema)
 
             if self._table_name in tables:
@@ -102,7 +102,7 @@ class Parquet_to_snapshot(PythonOperator):
                 chunk_df = df.iloc[start:end]
                 chunk_df.to_sql(
                     name=self._table_name,
-                    con=self._engine,
+                    con=engine,
                     schema=self._schema,
                     if_exists="append",
                     index=False,

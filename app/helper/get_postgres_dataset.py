@@ -21,15 +21,13 @@ def get_postgres_dataset(conn_id: str, table: str, schema: str = "raw") -> Datas
         engine: Engine = ConnectorDb.get_db_engine(conn_id)
         url = engine.url
 
-        if not url.drivername.startswith("postgresql"):
-            raise ValueError(f"Driver PostgreSQL non supporté : {url.drivername}")
-
+        host = url.host
         database = url.database
-        
-        if not database:
-            raise ValueError("Impossible de récupérer le nom de la base")
 
-        dataset_uri = f"postgres://{database}/{schema}/{table}"
+        if not host or not database:
+            raise ValueError("Host ou database manquant dans la connexion")
+
+        dataset_uri = f"postgres://{host}/{database}/{schema}/{table}"
         logging.info(f"Dataset PostgreSQL créé : {dataset_uri}")
 
         return Dataset(dataset_uri)
