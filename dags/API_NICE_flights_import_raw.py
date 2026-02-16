@@ -102,37 +102,37 @@ with DAG(
     )
 
     # Filtrage des vols du jour même qui sont déjà arrivés pour les charger dans la table de raw
-    task_filter_raw_flights = Filter_raw_flights(
-        input_parquet_file="task_transform_scheduled_flights",
-        output_parquet_file="task_filter_raw_flights",
-        task_id="task_filter_raw_flights",
-    )
+    # task_filter_raw_flights = Filter_raw_flights(
+    #     input_parquet_file="task_transform_scheduled_flights",
+    #     output_parquet_file="task_filter_raw_flights",
+    #     task_id="task_filter_raw_flights",
+    # )
 
     # Filtrage des vols du jour même qui ne sont pas encore arrivés pour les charger dans la table de staging
-    task_filter_scheduled_flights = Filter_scheduled_flights(
-        input_parquet_file="task_transform_scheduled_flights",
-        output_parquet_file="task_filter_scheduled_flights",
-        task_id="task_filter_scheduled_flights",
-    )
+    # task_filter_scheduled_flights = Filter_scheduled_flights(
+    #     input_parquet_file="task_transform_scheduled_flights",
+    #     output_parquet_file="task_filter_scheduled_flights",
+    #     task_id="task_filter_scheduled_flights",
+    # )
 
     # Fusion des vols de la veille (raw) et des vols du jour même déjà arrivés (filtered raw) pour les charger dans la table de raw
-    task_merge_raw_files = Merge_files(
-        input_parquet_file_1="task_filter_raw_flights",
-        input_parquet_file_2="task_transform_raw_flights",
-        output_parquet_file="task_merge_raw_files",
-        task_id="task_merge_raw_files",
-    )
+    # task_merge_raw_files = Merge_files(
+    #     input_parquet_file_1="task_transform_raw_flights",
+    #     input_parquet_file_2="task_transform_scheduled_flights",
+    #     output_parquet_file="task_merge_raw_files",
+    #     task_id="task_merge_raw_files",
+    # )
 
     # Ajout des informations techniques pour le fichier raw
     task_add_technical_info_raw = Parquet_add_technical_info(
-        input_parquet_file="task_merge_raw_files", 
+        input_parquet_file="task_transform_raw_flights", 
         output_parquet_file="task_add_technical_info_raw",
         task_id="task_add_technical_info_raw", 
     )
 
     # Ajout des informations techniques pour le fichier scheduled
     task_add_technical_info_scheduled = Parquet_add_technical_info(
-        input_parquet_file="task_filter_scheduled_flights", 
+        input_parquet_file="task_transform_scheduled_flights", 
         output_parquet_file="task_add_technical_info_scheduled", 
         task_id="task_add_technical_info_scheduled", 
     )
@@ -161,5 +161,5 @@ with DAG(
     # Les données de vol "raw" et "scheduled" suivent des chemins parallèles d'extraction, de transformation et de chargement.
     task_extract_API_raw_flight >> task_extract_API_scheduled_flight
 
-    task_extract_API_raw_flight >> task_transform_raw_flights >> task_transform_scheduled_flights >> task_filter_raw_flights >> task_merge_raw_files >> task_add_technical_info_raw >> task_load_raw_to_db
-    task_extract_API_scheduled_flight >> task_transform_scheduled_flights >> task_filter_scheduled_flights >> task_add_technical_info_scheduled >> task_load_scheduled_to_db
+    task_extract_API_raw_flight >> task_transform_raw_flights >> task_add_technical_info_raw >> task_load_raw_to_db
+    task_extract_API_scheduled_flight >> task_transform_scheduled_flights >> task_add_technical_info_scheduled >> task_load_scheduled_to_db

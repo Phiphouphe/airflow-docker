@@ -14,7 +14,7 @@ class Filter_raw_flights(PythonOperator):
     def __init__(
         self,
         input_parquet_file: str,
-        output_parquet_file: str = "raw_flights.parquet",
+        output_parquet_file: str = "raw_flights",
         execution_timeout: timedelta = timedelta(seconds=30),
         task_id: str = "filter_raw_flights",
         **kwargs,
@@ -24,7 +24,7 @@ class Filter_raw_flights(PythonOperator):
 
         Arguments :
         - input_parquet_file (str) : Nom du fichier Parquet d'entrée.
-        - output_parquet_file (str) : Nom du fichier Parquet pour les vols filtrés. Par défaut "raw_flights.parquet".
+        - output_parquet_file (str) : Nom du fichier Parquet pour les vols filtrés. Par défaut "raw_flights".
         - execution_timeout (timedelta, optionnel) : Durée maximale d'exécution. Par défaut 30 secondes.
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "filter_raw_flights".
         """
@@ -47,13 +47,13 @@ class Filter_raw_flights(PythonOperator):
             raise AirflowFailException("❌ Colonne 'actual_arrival' introuvable dans le DataFrame")
         
         # DEBUG : Vérifie ce que pandas voit dans actual_arrival
-        print("✅ DEBUG", df[["flight_number", "actual_arrival"]])
+        # print("✅ DEBUG", df[["flight_number", "actual_arrival"]])
 
         # Filtrer en deux catégories
         df_filter = df[df["actual_arrival"].notna()].copy()
 
         # DEBUG : Vérifie ce que pandas voit dans actual_arrival
-        print("✅ DEBUG", df_filter[["flight_number", "actual_arrival"]])
+        # print("✅ DEBUG", df_filter[["flight_number", "actual_arrival"]])
 
 
         logging.info(f"✅ Filtrage : {len(df_filter)} vols dans raw_flights")

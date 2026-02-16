@@ -33,7 +33,7 @@ class Parquet_to_snapshot(PythonOperator):
            Arguments :
            - input_parquet_file (str) : Nom du fichier Parquet d'entrée.
            - table_name (str) : Nom de la table cible dans PostgreSQL.
-           - schema (str, optionnel) : Schéma de la table cible. Par défaut "public".
+           - schema (str, optionnel) : Schéma de la table cible. Par défaut "raw".
            - database_conn_id (str, optionnel) : Identifiant de la connexion à la base de données dans Airflow. Par défaut "flight_dw_postgres". 
            - chunksize (int, optionnel) : Nombre de lignes à insérer par chunk pour éviter les problèmes de mémoire. Par défaut 1000. 
            - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "Parquet_to_snapshot".   

@@ -15,7 +15,7 @@ class API_extraction(PythonOperator):
         api_params: dict,
         output_parquet_file : str,
         transform_function: callable = None,
-        flight_mode: str = "scheduled",
+        flight_mode: str = "raw",
         execution_timeout: timedelta = timedelta(seconds=60),
         task_id: str = "API_extraction",
         **kwargs
@@ -29,7 +29,7 @@ class API_extraction(PythonOperator):
         - api_params (dict) : Paramètres de requête envoyés à l’API.
         - output_parquet_file (str) : Nom du fichier de sortie.
         - transform_function (callable, optionnel) : Fonction appliquée aux données brutes avant conversion en DataFrame. Par défaut None.
-        - flight_mode (str, optionnel) : Mode de vol pour définir les plages de temps de l'API. "scheduled" pour les vols du jour même, "raw" pour les vols du jour précédent. Par défaut "scheduled".
+        - flight_mode (str, optionnel) : Mode de vol pour définir les plages de temps de l'API. "scheduled" pour les vols du jour même, "raw" pour les vols du jour précédent. Par défaut "raw".
         - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 60 secondes.
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "API_extraction".
         """
