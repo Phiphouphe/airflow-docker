@@ -14,9 +14,9 @@ class Parquet_add_technical_info(PythonOperator):
         self,
         task_id: str = "add_technical_info",
         input_parquet_file: str = None, 
-        date_column: str = "DATE_PHOTO",  
-        year_column: str = "ANNEE_PHOTO",
-        week_column: str = "SEMAINE_PHOTO",
+        date_column: str = "date_photo",  
+        year_column: str = "annee_photo",
+        week_column: str = "semaine_photo",
         instance_column: str = "instance_id",  
         execution_date_column: str = "execution_date",
         output_parquet_file: str = None,
@@ -27,18 +27,18 @@ class Parquet_add_technical_info(PythonOperator):
         Args:
             task_id (str, optional): Identifiant unique pour la tâche dans le DAG. Defaults to "add_technical_info".
             input_parquet_file (str, optional): Chemin du fichier Parquet cible. Defaults to None.
-            date_column (str, optional): Nom de la colonne pour la date d'exécution. Defaults to "DATE_PHOTO".
-            year_column (str, optional): Nom de la colonne pour l'année d'exécution. Defaults to "ANNEE_PHOTO".
-            week_column (str, optional): Nom de la colonne pour la semaine d'exécution. Defaults to "SEMAINE_PHOTO".
+            date_column (str, optional): Nom de la colonne pour la date d'exécution. Defaults to "date_photo".
+            year_column (str, optional): Nom de la colonne pour l'année d'exécution. Defaults to "annee_photo".
+            week_column (str, optional): Nom de la colonne pour la semaine d'exécution. Defaults to "semaine_photo".
             instance_column (str, optional): Nom de la colonne pour l'identifiant d'instance. Defaults to "instance_id".
             execution_date_column (str, optional): Nom de la colonne pour la date d'éxecution du DAG. Defaults to "execution_date".
             output_parquet_file (str, optional): Chemin du fichier Parquet de sortie. Defaults to None.
         """
 
         self.__input_parquet_file = input_parquet_file
-        self.__date_column = date_column
-        self.__year_column = year_column
-        self.__week_column = week_column
+        self.__date_column = date_column.lower()
+        self.__year_column = year_column.lower()
+        self.__week_column = week_column.lower()
         self.__instance_column = instance_column
         self.__output_parquet_file = output_parquet_file
         self.__execution_date_column = execution_date_column

@@ -1,39 +1,224 @@
-# Filtrer les vols car les vols du J qui sont déjà arrivés vont dans RAW avec une DATE_PHOTO à J
-# Le lendemain donc à J+1, les vols de J seront aussi dans RAW mais avec une DATE_PHOTO à J+1. 
-# Exemple
-# INJECTION le 13/02 -> Vol terminé 9999 : flight_id= 20260213 DATE_PHOTO= 2026-02-13 dans RAW car RAW= J (=vol terminé) + J-1
-# INJECTION le 14/02 -> Vol terminé 9999 : flight_id= 20260213 DATE_PHOTO= 2026-02-14 dans RAW car RAW= J (=vol terminé) + J-1
-# Garder la DATE_PHOTO la plus récente si doublon dans RAW ou STAGING ?
+import pandas as pd
+import sys
+import os
+import pendulum
 
-# INJECTION le 13/02 en BACKFILL (du 08/01 au 10/01) -> Retirer tous les vols CANCELLED inclus dans plage BACKFILL dans SCHEDULED
-# Filtrer avec date.now() pour ne garder que les vols en cours ?
-# Donc si BACKFILL du 08/01 au 10/01, on retire tous les vols CANCELLED du 08/01 au 10/01 dans SCHEDULED car SCHEDULED doit contenir uniquement les vols à venir ou en cours, pas les vols déjà terminés ou annulés.
+from datetime import timedelta
+from airflow import DAG
+from airflow.utils.task_group import TaskGroup
+from airflow.datasets import Dataset
 
-# VALIDER. Ne garder que les vols J-1 pour RAW et les vols J (même si déjà atterris) pour SCHEDULED. 
-# Mettre des Tasksgroup
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-# Corriger les types : colonnes dates en datetime
-# df["scheduled_departure"] = pd.to_datetime(df["scheduled_departure"])
-# df["actual_departure"] = pd.to_datetime(df["actual_departure"])
-# df["scheduled_arrival"] = pd.to_datetime(df["scheduled_arrival"])
-# df["actual_arrival"] = pd.to_datetime(df["actual_arrival"])
-# df["delay_minutes"] = pd.to_numeric(df["delay_minutes"], errors="coerce")
+import app.helper as helper
 
-# Gestion des valeurs manquantes : imputer ou filtrer
-# df["delay_minutes"] = df["delay_minutes"].fillna(0)
-# df["is_cancelled"] = df["status"] == "CANCELLED"
+from app.tasks.Extract.DB_extraction import DB_extraction
+from app.tasks.Transform.DateConverter import DateConverter
+from app.tasks.Transform.TypeConverter import TypeConverter
+from app.tasks.Transform.DuplicateRemover import DuplicateRemover
 
-# Suppression des doublons : si nécessaire
-# df = df.drop_duplicates(subset=["flight_number", "scheduled_departure", "flight_id"]) : garder la DATE_PHOTO la plus récente si doublon dans RAW ou STAGING ?
 
-# Suppression des colonnes inutiles
-# df = df.drop(columns=["unnecessary_column1", "unnecessary_column2"])
+# Définition du DAG
+DAG_ID = "NICE_flights_staging"
+LIBELLE = "Nettoyage et transformation des données de vol pour les étapes Raw et Staging"
+DESCRIPTION = "Nettoyage et transformation des données de vol en partance de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw."
 
-# Colonnes dérivées : 
-# df["is_delayed"] = df["delay_minutes"] > 15
-# df["delay_category"] = pd.cut(df["delay_minutes"], bins=[-1, 0, 15, float("inf")], labels=["on_time", "minor_delay", "major_delay"])
-# df["is_landed"] = df["actual_arrival"].notna().apply(lambda x: True if x else False)
-# df["is_delay_minutes"] = (df["scheduled_departure"] - df["actual_departure"]) - (df["scheduled_arrival"] - df["actual_arrival"])
+raw_flights_table = Dataset("postgres://postgres_api/flight_dw/raw/raw_flights")
+raw_scheduled_flights_table = Dataset("postgres://postgres_api/flight_dw/raw/raw_scheduled_flights")
 
-# Jointures : 
-# IATA et Meteo
+default_args = {
+    'owner': 'airflow',
+    'depends_on_past': False,
+    'retries': 2,
+    'retry_delay': timedelta(seconds=5),
+}
+
+with DAG(
+    dag_id=DAG_ID,
+    default_args=default_args,
+    start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
+    schedule=[raw_flights_table, raw_scheduled_flights_table],
+    tags=["FLIGHTS", "TRANSFORMATION", "STAGING"],
+    catchup=False,
+    max_active_runs=1,
+    dagrun_timeout=timedelta(minutes=15),
+    description=DESCRIPTION,
+    doc_md="""
+            Nettoyage et transformation des données de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw.
+        """
+) as dag:
+    
+    with TaskGroup('extraction_db') as extraction_db:
+        # Extraction des données du vol de la veille (raw) depuis la base de données
+        task_extract_db_raw_flights = DB_extraction(
+            table_name="raw_flights",
+            schema_name="raw",
+            columns=["flight_id", 
+                     "flight_number", 
+                     "airline_code",
+                     "date",
+                     "scheduled_departure", 
+                     "actual_departure", 
+                     "scheduled_arrival", 
+                     "actual_arrival",
+                     "origin_airport",
+                     "destination_airport",
+                     "status",
+                     "delay_minutes",
+                     "delay_code",
+                     "registration",
+                     "type_code",
+                     "type_name",
+                     "owner_airline",
+                     "wifi_enabled",
+                     "dag_id",
+                     "execution_date",
+                     "date_photo",
+                     "semaine_photo",
+                     "annee_photo",
+                     "instance_id",
+            ],
+            database_conn_id="flight_dw_postgres",
+            output_parquet_file="task_extract_db_raw_flights",
+            task_id="task_extract_db_raw_flights",
+        )
+
+        # Extraction des données de vol du jour même (scheduled) depuis la base de données
+        task_extract_db_scheduled_flights = DB_extraction(
+            table_name="raw_scheduled_flights",
+            schema_name="raw",
+            columns=["flight_id", 
+                     "flight_number", 
+                     "airline_code",
+                     "date",
+                     "scheduled_departure", 
+                     "actual_departure", 
+                     "scheduled_arrival", 
+                     "actual_arrival",
+                     "origin_airport",
+                     "destination_airport",
+                     "status",
+                     "delay_minutes",
+                     "delay_code",
+                     "registration",
+                     "type_code",
+                     "type_name",
+                     "owner_airline",
+                     "wifi_enabled",
+                     "dag_id",
+                     "execution_date",
+                     "date_photo",
+                     "semaine_photo",
+                     "annee_photo",
+                     "instance_id",
+            ],
+            database_conn_id="flight_dw_postgres",
+            output_parquet_file="task_extract_db_scheduled_flights",
+            task_id="task_extract_db_scheduled_flights",
+        )
+
+        [task_extract_db_raw_flights, task_extract_db_scheduled_flights]
+
+
+    with TaskGroup('convert_date_columns') as convert_date_columns:
+        # Conversion des dates pour le fichier raw (vols de la veille)
+        task_convert_date_columns_raw_flights = DateConverter(
+            input_file="task_extract_db_raw_flights",
+            output_file="task_convert_date_columns_raw_flights",
+            timestamps_columns=["scheduled_departure",
+                                "actual_departure",
+                                "scheduled_arrival",
+                                "actual_arrival"],
+            date_columns=["date"],
+            task_id="task_convert_date_columns_raw_flights",
+        )
+
+        # Conversion des dates pour le fichier scheduled (vols du jour même)
+        task_convert_date_columns_scheduled_flights = DateConverter(
+            input_file="task_extract_db_scheduled_flights",
+            output_file="task_convert_date_columns_scheduled_flights",
+            timestamps_columns=["scheduled_departure",
+                                "actual_departure",
+                                "scheduled_arrival",
+                                "actual_arrival"],
+            date_columns=["date"],
+            task_id="task_convert_date_columns_scheduled_flights",
+        )
+
+        [task_convert_date_columns_raw_flights, task_convert_date_columns_scheduled_flights]
+
+
+    with TaskGroup('convert_type_columns') as convert_type_columns:
+        # Conversion des colonnes pour le fichier raw (vols de la veille)
+        task_convert_type_columns_raw_flights = TypeConverter(
+            input_file="task_convert_date_columns_raw_flights",
+            output_file="task_convert_type_columns_raw_flights",
+            text_columns=[
+                "flight_id", "flight_number", "airline_code",
+                "origin_airport", "destination_airport",
+                "status", "delay_code", "registration",
+                "type_code", "type_name", "owner_airline"
+            ],
+            int_columns=[
+                "delay_minutes"
+            ],
+            bool_columns={
+                "wifi_enabled": {"Y": True, "N": False}
+            },
+            task_id="task_convert_type_columns_raw_flights",
+        )
+
+        # Conversion des colonnes pour le fichier scheduled (vols du jour même)
+        task_convert_type_columns_scheduled_flights = TypeConverter(
+            input_file="task_convert_date_columns_scheduled_flights",
+            output_file="task_convert_type_columns_scheduled_flights",
+            text_columns=[
+                "flight_id", "flight_number", "airline_code",
+                "origin_airport", "destination_airport",
+                "status", "delay_code", "registration",
+                "type_code", "type_name", "owner_airline"
+            ],
+            int_columns=[
+                "delay_minutes"
+            ],
+            bool_columns={
+                "wifi_enabled": {"Y": True, "N": False}
+            },
+            task_id="task_convert_type_columns_scheduled_flights",
+        )
+
+    with TaskGroup('duplicate_remover') as duplicate_remover:
+        # Suppression des doublons pour le fichier raw (vols de la veille)
+        task_duplicate_remover_raw_flights = DuplicateRemover(
+            input_file="task_convert_type_columns_raw_flights",
+            output_file="task_duplicate_remover_raw_flights",
+            key_columns=[
+                "flight_id",
+                "flight_number",
+                "date",
+                "origin_airport",
+                "destination_airport"]
+            keep="last",  # garde la dernière occurrence
+            task_id="task_duplicate_remover_raw_flights",
+        ) 
+
+        # Suppression des doublons pour le fichier scheduled (vols du jour même)
+        task_duplicate_remover_raw_flights = DuplicateRemover(
+            input_file="task_convert_type_columns_raw_flights",
+            output_file="task_duplicate_remover_raw_flights",
+            key_columns=[
+                "flight_id",
+                "flight_number",
+                "date",
+                "origin_airport",
+                "destination_airport"]
+            keep="last",  # garde la dernière occurrence
+            task_id="task_duplicate_remover_raw_flights",
+        ) 
+        
+        
+        
+        
+        # Définition des dépendances entre les tâches
+
+        extraction_db >> convert_date_columns >> convert_type_columns >> duplicate_remover

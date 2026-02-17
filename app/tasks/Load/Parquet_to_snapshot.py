@@ -70,12 +70,12 @@ class Parquet_to_snapshot(PythonOperator):
         engine = ConnectorDb.get_db_engine(self._db_conn_id)
 
         # Vérifier colonne DATE_PHOTO
-        if 'DATE_PHOTO' not in df.columns:
-            raise ValueError("❌ La colonne 'DATE_PHOTO' est requise dans le Parquet")
+        if 'date_photo' not in df.columns:
+            raise ValueError("❌ La colonne 'date_photo' est requise dans le Parquet")
 
         # Récupérer les dates uniques
-        unique_dates = df['DATE_PHOTO'].unique()
-        logging.info(f"DATE_PHOTO unique: {unique_dates}")
+        unique_dates = df['date_photo'].unique()
+        logging.info(f"date_photo unique: {unique_dates}")
         if len(unique_dates) > 1:
             raise ValueError("❌ Le Parquet doit contenir une seule valeur unique pour DATE_PHOTO")
         date_photo = unique_dates[0]
@@ -85,10 +85,10 @@ class Parquet_to_snapshot(PythonOperator):
             tables = inspector.get_table_names(schema=self._schema)
 
             if self._table_name in tables:
-                logging.info(f"🗑️ Suppression des anciennes données pour DATE_PHOTO={date_photo}")
+                logging.info(f"🗑️ Suppression des anciennes données pour date_photo={date_photo}")
                 delete_query = text(f"""
                     DELETE FROM "{self._schema}"."{self._table_name}"
-                    WHERE "DATE_PHOTO" = :date_photo
+                    WHERE "date_photo" = :date_photo
                 """)
                 conn.execute(delete_query, {"date_photo": date_photo})
             else:
