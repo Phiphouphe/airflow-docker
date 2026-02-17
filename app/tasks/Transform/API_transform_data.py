@@ -30,33 +30,42 @@ class API_transform_data(PythonOperator):
         - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "API_transform_data".
         """
-        self.input_file = input_parquet_file
-        self.output_file = output_parquet_file
-        self.transform_function = transform_function
+        self._input_file = input_parquet_file
+        self._output_file = output_parquet_file
+        self._transform_function = transform_function
         
         super().__init__(
             task_id=task_id,
             python_callable=self._run,
-            # execute_timeout=execution_timeout,
+            execution_timeout=execution_timeout,
             **kwargs,
         )
 
     def _run(self):
 
         # Charger le parquet d'entrée
-        df = helper.load_parquet_to_df(self.dag.dag_id, self.input_file, have_file_security=True)
+        df = helper.load_parquet_to_df(self.dag.dag_id, self._input_file, have_file_security=True)
+
+        # Voir les lignes avant transformation
+        print("Type avant transformation", type(df))
+        print("Lignes avant transformation", df.head(5))
 
         # Transformation des données (à partir de la fonction fournie)
         try:
-            df = self.transform_function(df)
+            df = self._transform_function(df)
             logging.info(f"✅ Transformation appliquée : {len(df)} lignes conservées.")
             logging.info(f"✅ Transformation appliquée avec succès.")
         except Exception as e:
             raise AirflowFailException(f"❌ Erreur lors de l'application de la transformation : {e}")
+        
+        # Voir les lignes après transformation
+        print("Type après transformation", type(df))
+        print("Lignes après transformation", df.head(5))
+        print("Colonnes après transformation", df.columns)
            
         # Sauvegarde du fichier (généralement vers un fichier temporaire)
         helper.generate_parquet_to_temp(
             self.dag.dag_id,
             df,
-            self.output_file,
+            self._output_file,
         )

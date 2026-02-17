@@ -1,1 +1,2 @@
-from app.static.simplify_air_france_flights import AirFranceAPI
+from app.static.simplify_air_france_flights import simplify_flights
+from app.static.connector_db import ConnectorDb
