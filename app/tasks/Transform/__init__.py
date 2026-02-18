@@ -6,3 +6,5 @@ from app.tasks.Transform.Parquet_add_technical_info import Parquet_add_technical
 from app.tasks.Transform.DateConverter import DateConverter
 from app.tasks.Transform.TypeConverter import TypeConverter
 from app.tasks.Transform.DuplicateRemover import DuplicateRemover
+from app.tasks.Transform.ColumnRemover import ColumnRemover
+from app.tasks.Transform.FunctionApply import ApplyFunction

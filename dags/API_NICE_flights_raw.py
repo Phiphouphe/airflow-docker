@@ -22,7 +22,7 @@ from app.static.simplify_air_france_flights import simplify_flights
 API_KEY = Variable.get("AIRFRANCE_API_KEY")
 
 # Définition du DAG
-DAG_ID = "API_NICE_flights_import_raw"
+DAG_ID = "API_NICE_flights_raw"
 LIBELLE = "Import des datas vol pour les étapes Raw et Staging via API"
 DESCRIPTION = "Import des données de vol en partance de NICE depuis une API externe (Air France) vers la base de données flight_dw."
 

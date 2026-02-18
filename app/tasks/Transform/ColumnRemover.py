@@ -1,42 +1,39 @@
 import logging
-import pandas as pd
 
 import app.helper as helper
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
 
-class DuplicateRemover(PythonOperator):
+class ColumnRemover(PythonOperator):
 
     def __init__(
         self,
         input_file: str,
         output_file: str,
-        key_columns: list,
-        keep: str = "last", 
+        columns_to_drop: list,
         null_threshold_percent: float = 50.0,
         execution_timeout: timedelta = timedelta(seconds=30),
-        task_id: str = "DuplicateRemover",
+        task_id: str = "ColumnRemover",
         **kwargs,
     ):
         """
-        Supprime les doublons d'un DataFrame en fonction de colonnes clés et génère un fichier Parquet de sortie.
+        Supprime les colonnes d'un DataFrame et génère un fichier Parquet de sortie.
 
         Arguments :
         - input_file (str) : Nom du fichier source Parquet à traiter.
-        - output_file (str) : Nom du fichier Parquet de sortie après suppression des doublons.
-        - key_columns (list) : Liste des colonnes utilisées pour identifier les doublons.
-        - keep (str, optionnel) : Stratégie pour conserver les doublons. Par défaut "last": conserve la dernière occurrence
+        - output_file (str) : Nom du fichier Parquet de sortie après suppression des colonnes.
+        - columns (list) : Liste des colonnes à supprimer.
+        - null_threshold_percent (float, optionnel) : Pourcentage maximal de valeurs NULL autorisé sur chaque colonne. Par défaut 50%.
         - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
-        - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "DuplicateRemover".
+        - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "ColumnRemover".
         """
 
         self._input_file = input_file
         self._output_file = output_file
-        self._key_columns = key_columns
-        self._keep = keep
+        self._columns = columns_to_drop
         self._threshold_percent = null_threshold_percent
 
         super().__init__(
@@ -55,21 +52,23 @@ class DuplicateRemover(PythonOperator):
         print("Type avant transformation", type(df))
         print("Lignes avant transformation", df.head(5))
 
-        # Suppression des doublons
+        # Suppression des colonnes
         try:
-            before_count = len(df)
-            df = df.drop_duplicates(subset=self._key_columns, keep=self._keep)
-            after_count = len(df)
+            cols_to_drop = [col for col in self._columns if col in df.columns]
 
-            logging.info(f"Suppression des doublons terminée : {before_count - after_count} doublons supprimés.")
+            if not cols_to_drop:
+                logging.warning("⚠️ Aucune colonne à supprimer trouvée dans le DataFrame.")
+            else:
+                df = df.drop(columns=cols_to_drop)
+                logging.info(f"Suppression des colonnes terminée : {cols_to_drop}")
 
         except Exception as e:
-            raise AirflowFailException(f"Erreur lors de la suppression des doublons : {e}")
+            raise AirflowFailException(f"Erreur lors de la suppression des colonnes : {e}")
 
-        # ✅ Contrôle qualité
+        # ✅ Contrôle des valeurs NULL sur toutes les colonnes
         helper.check_nulls(
             df,
-            columns=None,
+            columns=None,             
             threshold_percent=self._threshold_percent,
         )
 
