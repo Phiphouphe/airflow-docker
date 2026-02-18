@@ -21,8 +21,8 @@ from app.tasks.Load.Load_to_database import Load_to_database
 
 # Définition du DAG
 DAG_ID = "NICE_flights_staging"
-LIBELLE = "Nettoyage et transformation des données de vol pour les étapes Raw et Staging"
-DESCRIPTION = "Nettoyage et transformation des données de vol en partance de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw."
+LIBELLE = "Nettoyage et transformation technique des données de vol pour les étapes Raw et Staging"
+DESCRIPTION = "Nettoyage et transformation technique des données de vol en partance de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw."
 
 raw_flights_table = Dataset("postgres://postgres_api/flight_dw/raw/raw_flights")
 raw_scheduled_flights_table = Dataset("postgres://postgres_api/flight_dw/raw/raw_scheduled_flights")
@@ -45,7 +45,7 @@ with DAG(
     dagrun_timeout=timedelta(minutes=15),
     description=DESCRIPTION,
     doc_md="""
-            Nettoyage et transformation des données de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw.
+            Nettoyage et transformation technique des données de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw.
         """
 ) as dag:
     
@@ -200,7 +200,8 @@ with DAG(
                 "date",
                 "origin_airport",
                 "destination_airport"],
-            keep="last",  
+            keep="last",
+            null_threshold_percent=20,  
             task_id="task_duplicate_remover_raw_flights",
         ) 
 
@@ -215,6 +216,7 @@ with DAG(
                 "origin_airport",
                 "destination_airport"],
             keep="last", 
+            null_threshold_percent=20,
             task_id="task_duplicate_remover_scheduled_flights",
         ) 
 

@@ -11,10 +11,6 @@ from airflow.providers.standard.operators.python import PythonOperator
 
 
 class VersionSelector(PythonOperator):
-    """
-    Pour chaque objet métier (défini par key_columns), garde la version la plus récente
-    selon une colonne de référence temporelle (ex: date_photo).
-    """
 
     def __init__(
         self,
@@ -27,22 +23,17 @@ class VersionSelector(PythonOperator):
         **kwargs,
     ):
         """
-        Parameters
-        ----------
-        input_file : str
-            Fichier parquet source.
-        output_file : str
-            Fichier parquet de sortie.
-        key_columns : list[str]
-            Colonnes qui identifient un objet métier unique.
-        date_column : str
-            Colonne qui détermine la version la plus récente (ex: date_photo).
-        execution_timeout : timedelta, optional
-            Durée maximale de la tâche.
-        task_id : str, optional
-            Identifiant de la tâche Airflow.
-        **kwargs :
-            Arguments supplémentaires pour PythonOperator.
+        Garde, pour chaque objet métier défini par `key_columns`, la version la plus récente 
+        selon une colonne de référence temporelle (ex: `date_photo`) et génère un fichier Parquet de sortie.
+
+        Arguments :
+        - input_file (str) : Fichier Parquet source à traiter.
+        - output_file (str) : Fichier Parquet de sortie contenant uniquement les dernières versions.
+        - key_columns (list) : Colonnes identifiant un objet métier unique.
+        - date_column (str) : Colonne qui détermine la version la plus récente (ex: date_photo).
+        - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
+        - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "VersionSelector".
+        - **kwargs : Arguments supplémentaires transmis au PythonOperator.
         """
         self._input_file = input_file
         self._output_file = output_file

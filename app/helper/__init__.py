@@ -3,3 +3,4 @@ from app.helper.load_json_to_dict import load_json_to_dict
 from app.helper.fetch_api_to_df import fetch_api_to_df
 from app.helper. generate_parquet_to_temp import generate_parquet_to_temp
 from app.helper.get_postgres_dataset import get_postgres_dataset
+from app.helper.check_nulls import check_nulls
