@@ -77,7 +77,7 @@ class DateConverter(PythonOperator):
 
                 df[col] = pd.to_datetime(
                     df[col],
-                    errors="coerce").dt.normalize()  # garde uniquement la date
+                    errors="coerce").dt.date  # garde uniquement la date
 
                 logging.info(f"[DATE] {col} | {before} -> {df[col].dtype}")
 

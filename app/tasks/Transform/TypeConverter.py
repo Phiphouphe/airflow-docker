@@ -17,12 +17,24 @@ class TypeConverter(PythonOperator):
         output_file: str,
         text_columns: list = None,
         int_columns: list = None,
-        bool_columns: dict = None,  # mapping valeur -> bool, ex: {"Y": True, "N": False}
+        bool_columns: dict = None,  
         execution_timeout: timedelta = timedelta(seconds=30),
         task_id: str = "TypeConverter",
         **kwargs,
-    ):
-        
+        ):
+        """
+        Convertit les colonnes d’un DataFrame en fonction des types spécifiés (texte, entier, booléen) et génère un fichier temporaire au format Parquet.
+
+        Arguments :
+        - input_file (str) : Nom du fichier Parquet source à charger.
+        - output_file (str) : Nom du fichier Parquet de sortie après transformation.
+        - text_columns (list[str], optionnel) : Liste des colonnes à convertir en texte (str). Par défaut None.
+        - int_columns (list[str], optionnel) : Liste des colonnes à convertir en entier nullable (Int64). Par défaut None.
+        - bool_columns (dict[str, dict], optionnel) : Dictionnaire des colonnes booléennes à convertir avec mapping personnalisé. Exemple : {"wifi_enabled": {"Y": True, "N": False}}. Par défaut None.
+        - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
+        - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "TypeConverter".
+        """
+  
         self._input_file = input_file
         self._output_file = output_file
         self._text_columns = text_columns or []
@@ -48,8 +60,11 @@ class TypeConverter(PythonOperator):
                 if col not in df.columns:
                     logging.warning(f"Colonne '{col}' introuvable")
                     continue
+                before = df[col].dtype
                 df[col] = df[col].astype(str)
-                logging.info(f"Colonne texte convertie : {col}")
+                after = df[col].dtype
+
+                logging.info(f"{col} | dtype avant : {before} | dtype après : {after}")
 
             # --- Colonnes int ---
             for col in self._int_columns:
@@ -57,16 +72,25 @@ class TypeConverter(PythonOperator):
                     logging.warning(f"Colonne '{col}' introuvable")
                     continue
                 # Remplacer les "null" ou valeurs invalides par NaN puis convertir
-                df[col] = pd.to_numeric(df[col].replace("null", pd.NA), errors="coerce").astype("Int64")
-                logging.info(f"Colonne entière convertie : {col}")
+                before = df[col].dtype
+                df[col] = (
+                    pd.to_numeric(df[col].replace("null", pd.NA), errors="coerce")
+                    .astype("Int64")
+                )
+                after = df[col].dtype
+
+                logging.info(f"{col} | dtype avant : {before} | dtype après : {after}")
 
             # --- Colonnes bool ---
             for col, mapping in self._bool_columns.items():
                 if col not in df.columns:
                     logging.warning(f"Colonne '{col}' introuvable")
                     continue
+                before = df[col].dtype
                 df[col] = df[col].map(mapping).astype("boolean")
-                logging.info(f"Colonne booléenne convertie : {col}")
+                after = df[col].dtype
+
+                logging.info(f"{col} | dtype avant : {before} | dtype après : {after}")
 
         except Exception as e:
             raise AirflowFailException(f"Erreur lors de la conversion des types : {e}")

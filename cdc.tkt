@@ -13,14 +13,14 @@
 # VALIDER. Mettre des Tasksgroup
 # VALIDER. Mettre des Dataset
 
-# A TESTER. Corriger les types : colonnes dates en datetime
+# VALIDER. Corriger les types : colonnes dates en datetime
 # df["scheduled_departure"] = pd.to_datetime(df["scheduled_departure"])
 # df["actual_departure"] = pd.to_datetime(df["actual_departure"])
 # df["scheduled_arrival"] = pd.to_datetime(df["scheduled_arrival"])
 # df["actual_arrival"] = pd.to_datetime(df["actual_arrival"])
 # df["delay_minutes"] = pd.to_numeric(df["delay_minutes"], errors="coerce")
 
-# A TESTER. Corriger les autres types
+# VALIDER. Corriger les autres types
 
 # A TESTER. Suppression des doublons : si nécessaire
 # df = df.drop_duplicates(subset=["flight_number", "scheduled_departure", "flight_id"]) : garder la DATE_PHOTO la plus récente si doublon dans RAW ou STAGING ?
@@ -28,9 +28,12 @@
 # Suppression des colonnes inutiles ?
 # df = df.drop(columns=["unnecessary_column1", "unnecessary_column2"])
 
-# Gestion des valeurs manquantes : imputer ou filtrer ?
-# df["delay_minutes"] = df["delay_minutes"].fillna(0)
-# df["is_cancelled"] = df["status"] == "CANCELLED"
+
+## ANALYTICS
+
+# Jointures : 
+# IATA et Meteo si code IATA correspondant
+# Voir si nettoyage IATA et Meteo nécessaire
 
 # Colonnes dérivées : 
 # df["is_delayed"] = df["delay_minutes"] > 15
@@ -38,12 +41,37 @@
 # df["is_landed"] = df["actual_arrival"].notna().apply(lambda x: True if x else False)
 # df["is_delay_minutes"] = (df["scheduled_departure"] - df["actual_departure"]) - (df["scheduled_arrival"] - df["actual_arrival"])
 
-# Jointures : 
-# IATA et Meteo si code IATA correspondant
-# Voir si nettoyage IATA et Meteo nécessaire
+# Garder la version la plus récente de DATE PHOTO
+# Utiliser VersionSelector avec clés + date_photo pour décider quelle ligne (version) garder (décision métier)
+
+# Gestion des valeurs manquantes : imputer ou filtrer ?
+# Vérifier les valeurs manquantes et les remplacer ?
+# df["delay_minutes"] = df["delay_minutes"].fillna(0)
+# df["is_cancelled"] = df["status"] == "CANCELLED"
+
 
 ## Machine Learning
 
-# Utiliser VersionSelector avec clés + date_photo pour décider quelle ligne (version) garder (décision métier)
 # Décider quelles métriques/colonnes créées pour algos ML 
 # Créer les algos ML 
+
+
+Today : Analytics
+- Nettoyage et valeurs manquantes
+- Déduplication/versionning
+- Création des colonnes dérivées et flag
+
+Demain : Analytics
+- Nettoyage des tables à joindre
+- Enrichissement/jointures
+- Calculs et KPIs
+
+Vendredi : ML
+- Préparation des features, encodage, normalisation, train/test split
+
+Samedi : ML
+- Choix des algos à appliquer
+
+Dimanche : ML
+- Installation MLFlow
+- Versionner et lancer avec MLFlow

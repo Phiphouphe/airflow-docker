@@ -16,6 +16,7 @@ from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.Transform.DateConverter import DateConverter
 from app.tasks.Transform.TypeConverter import TypeConverter
 from app.tasks.Transform.DuplicateRemover import DuplicateRemover
+from app.tasks.Load.Load_to_database import Load_to_database
 
 
 # Définition du DAG
@@ -125,7 +126,7 @@ with DAG(
         task_convert_date_columns_raw_flights = DateConverter(
             input_file="task_extract_db_raw_flights",
             output_file="task_convert_date_columns_raw_flights",
-            timestamps_columns=["scheduled_departure",
+            timestamp_columns=["scheduled_departure",
                                 "actual_departure",
                                 "scheduled_arrival",
                                 "actual_arrival"],
@@ -137,7 +138,7 @@ with DAG(
         task_convert_date_columns_scheduled_flights = DateConverter(
             input_file="task_extract_db_scheduled_flights",
             output_file="task_convert_date_columns_scheduled_flights",
-            timestamps_columns=["scheduled_departure",
+            timestamp_columns=["scheduled_departure",
                                 "actual_departure",
                                 "scheduled_arrival",
                                 "actual_arrival"],
@@ -187,6 +188,7 @@ with DAG(
             task_id="task_convert_type_columns_scheduled_flights",
         )
 
+
     with TaskGroup('duplicate_remover') as duplicate_remover:
         # Suppression des doublons pour le fichier raw (vols de la veille)
         task_duplicate_remover_raw_flights = DuplicateRemover(
@@ -197,28 +199,54 @@ with DAG(
                 "flight_number",
                 "date",
                 "origin_airport",
-                "destination_airport"]
-            keep="last",  # garde la dernière occurrence
+                "destination_airport"],
+            keep="last",  
             task_id="task_duplicate_remover_raw_flights",
         ) 
 
         # Suppression des doublons pour le fichier scheduled (vols du jour même)
-        task_duplicate_remover_raw_flights = DuplicateRemover(
-            input_file="task_convert_type_columns_raw_flights",
-            output_file="task_duplicate_remover_raw_flights",
+        task_duplicate_remover_scheduled_flights = DuplicateRemover(
+            input_file="task_convert_type_columns_scheduled_flights",
+            output_file="task_duplicate_remover_scheduled_flights",
             key_columns=[
                 "flight_id",
                 "flight_number",
                 "date",
                 "origin_airport",
-                "destination_airport"]
-            keep="last",  # garde la dernière occurrence
-            task_id="task_duplicate_remover_raw_flights",
+                "destination_airport"],
+            keep="last", 
+            task_id="task_duplicate_remover_scheduled_flights",
         ) 
-        
-        
-        
-        
-        # Définition des dépendances entre les tâches
 
-        extraction_db >> convert_date_columns >> convert_type_columns >> duplicate_remover
+        [task_duplicate_remover_raw_flights, task_duplicate_remover_scheduled_flights]
+        
+        
+    with TaskGroup('loading') as loading:
+        # Chargement du fichier raw dans la table stg_raw_flights                                                  
+        task_load_raw_to_db = Load_to_database(
+            table_name="stg_raw_flights",
+            schema_name="staging",
+            if_exists="append",
+            input_parquet_file="task_duplicate_remover_raw_flights",
+            database_conn_id="flight_dw_postgres",
+            task_id="task_load_raw_to_db",
+        )
+
+        # Chargement du fichier scheduled dans la table stg_raw_scheduled_flights
+        task_load_scheduled_to_db = Load_to_database(
+            table_name="stg_raw_scheduled_flights",
+            schema_name="staging",
+            if_exists="append",
+            input_parquet_file="task_duplicate_remover_scheduled_flights",
+            database_conn_id="flight_dw_postgres",
+            task_id="task_load_scheduled_to_db",
+        )
+
+        [task_load_raw_to_db, task_load_scheduled_to_db]   
+        
+        
+
+    # Définition des dépendances entre les tâches
+    # Les données de vol "raw" et "scheduled" suivent des chemins parallèles d'extraction, de transformation et de chargement.
+
+    extraction_db >> convert_date_columns >> convert_type_columns >> duplicate_remover >> loading

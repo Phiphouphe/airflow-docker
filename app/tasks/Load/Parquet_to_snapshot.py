@@ -1,18 +1,12 @@
 import logging
-import pandas as pd
 import time
-import json
-import pprint
-import pyarrow.parquet as pq
 
 import app.helper as helper
-import app.static.connector_db as connector_db
+
+from datetime import timedelta
+from sqlalchemy import text, inspect
 
 from airflow.operators.python import PythonOperator
-from airflow.exceptions import AirflowFailException
-from airflow.models import Variable
-from datetime import timedelta
-from sqlalchemy import engine, text, inspect
 
 from app.static.connector_db import ConnectorDb
 
