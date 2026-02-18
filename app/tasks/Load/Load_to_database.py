@@ -1,11 +1,9 @@
 import logging
 import time
-import pendulum
-import pandas as pd
 
 import app.helper as helper
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
 
@@ -46,11 +44,15 @@ class Load_to_database(PythonOperator):
         self._if_exists = if_exists
         self._have_chunksize = have_chunksize
         self._task_id = task_id
+
+        # Générer le Dataset Airflow pour les outlets
+        outlets = [helper.get_postgres_dataset(self._db_conn_id, self._table_name, self._schema_name)]
         
         super().__init__(
             task_id=task_id,
             python_callable=self._run,
             execution_timeout=execution_timeout,
+            outlets=outlets,
             **kwargs,
         )
 

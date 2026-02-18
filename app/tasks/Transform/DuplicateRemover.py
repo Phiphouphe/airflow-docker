@@ -15,14 +15,23 @@ class DuplicateRemover(PythonOperator):
         input_file: str,
         output_file: str,
         key_columns: list,
-        keep: str = "last",  # "first" ou "last"
+        keep: str = "last", 
         execution_timeout: timedelta = timedelta(seconds=30),
         task_id: str = "DuplicateRemover",
         **kwargs,
     ):
         """
-        
+        Supprime les doublons d'un DataFrame en fonction de colonnes clés et génère un fichier Parquet de sortie.
+
+        Arguments :
+        - input_file (str) : Nom du fichier source Parquet à traiter.
+        - output_file (str) : Nom du fichier Parquet de sortie après suppression des doublons.
+        - key_columns (list) : Liste des colonnes utilisées pour identifier les doublons.
+        - keep (str, optionnel) : Stratégie pour conserver les doublons. Par défaut "last": conserve la dernière occurrence
+        - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
+        - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "DuplicateRemover".
         """
+
         self._input_file = input_file
         self._output_file = output_file
         self._key_columns = key_columns
