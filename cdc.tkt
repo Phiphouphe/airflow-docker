@@ -69,9 +69,9 @@ df["is_landed"] = df["actual_arrival"].notna()
 
 Jeudi : Analytics
 - A TESTER. Suppression colonne delay_minutes (classe removecolumn)
-- Modifier format des données que je vais utiliser pour calculs (delay_code ? pour jointure)
-- Nettoyage des tables à joindre
-- Enrichissement/jointures
+- A TESTER. Modifier format des données que je vais utiliser pour calculs (delay_code ? pour jointure)
+- A TESTER. Nettoyage des tables à joindre (meteo + iata) : raw -> ajouter groupe + technical info / staging / analytics
+- A TESTER. Enrichissement/jointures
 - Calculs et KPIs
 1️⃣ KPI (Key Performance Indicator)
 Indicateurs clés pour mesurer la performance ou la qualité des vols :

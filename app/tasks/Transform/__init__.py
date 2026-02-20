@@ -8,3 +8,6 @@ from app.tasks.Transform.TypeConverter import TypeConverter
 from app.tasks.Transform.DuplicateRemover import DuplicateRemover
 from app.tasks.Transform.ColumnRemover import ColumnRemover
 from app.tasks.Transform.FunctionApply import ApplyFunction
+from app.tasks.Transform.PostgresArrayExtractor import PostgresArrayExtractor
+from app.tasks.Transform.VersionSelector import VersionSelector
+from app.tasks.Transform.ParquetJoin import ParquetJoin
