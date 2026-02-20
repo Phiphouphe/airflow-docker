@@ -1,4 +1,3 @@
-import pandas as pd
 import sys
 import os
 import pendulum
@@ -9,8 +8,6 @@ from airflow.utils.task_group import TaskGroup
 from airflow.datasets import Dataset
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-import app.helper as helper
 
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.Transform.DateConverter import DateConverter
@@ -160,9 +157,6 @@ with DAG(
                 "status", "delay_code", "registration",
                 "type_code", "type_name", "owner_airline"
             ],
-            int_columns=[
-                "delay_minutes"
-            ],
             bool_columns={
                 "wifi_enabled": {"Y": True, "N": False}
             },
@@ -179,14 +173,13 @@ with DAG(
                 "status", "delay_code", "registration",
                 "type_code", "type_name", "owner_airline"
             ],
-            int_columns=[
-                "delay_minutes"
-            ],
             bool_columns={
                 "wifi_enabled": {"Y": True, "N": False}
             },
             task_id="task_convert_type_columns_scheduled_flights",
         )
+
+        [task_convert_type_columns_raw_flights, task_convert_type_columns_scheduled_flights]
 
 
     with TaskGroup('duplicate_remover') as duplicate_remover:

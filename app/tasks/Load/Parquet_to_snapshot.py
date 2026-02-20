@@ -38,14 +38,10 @@ class Parquet_to_snapshot(PythonOperator):
         self._schema = schema
         self._db_conn_id = database_conn_id
         
-        # Générer le Dataset Airflow pour les outlets
-        outlets = [helper.get_postgres_dataset(self._db_conn_id, self._table_name, self._schema)]
-        
         super().__init__(
             task_id=task_id,
             python_callable=self._run,
             execution_timeout=timedelta(minutes=10),
-            outlets=outlets,
             **kwargs
         )
 
@@ -62,6 +58,9 @@ class Parquet_to_snapshot(PythonOperator):
 
         # Créer l'engine ici une seule fois
         engine = ConnectorDb.get_db_engine(self._db_conn_id)
+
+        # Générer le Dataset Airflow pour les outlets
+        dataset = helper.get_postgres_dataset(self._db_conn_id, self._table_name, self._schema)
 
         # Vérifier colonne DATE_PHOTO
         if 'date_photo' not in df.columns:

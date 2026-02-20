@@ -3,18 +3,18 @@ import numpy as np
 
 from airflow.exceptions import AirflowFailException
 
-def simplify_flights(df: pd.DataFrame) -> pd.DataFrame:
+def extract_flights(df: pd.DataFrame) -> pd.DataFrame:
     if "operationalFlights" not in df.columns:
         raise AirflowFailException("❌ 'operationalFlights' introuvable dans le DataFrame")
     
     flights_series = df["operationalFlights"].explode().dropna()
-    simplified_flights = []
+    extract_flights = []
 
     for flight in flights_series:
         # prendre le dernier leg
         leg = flight["flightLegs"][-1]
 
-        simplified_flights.append({
+        extract_flights.append({
             "flight_id": flight["id"],
             "flight_number": flight["flightNumber"],
             "airline_code": flight["airline"]["code"],
@@ -35,7 +35,7 @@ def simplify_flights(df: pd.DataFrame) -> pd.DataFrame:
             "wifi_enabled": leg["aircraft"].get("wifiEnabled"),
         })
 
-    for f in simplified_flights:
+    for f in extract_flights:
         dc = f["delay_code"]
         if dc is None:
             f["delay_code"] = '{}'
@@ -46,4 +46,4 @@ def simplify_flights(df: pd.DataFrame) -> pd.DataFrame:
         else:
             f["delay_code"] = '{' + str(dc) + '}'
 
-    return pd.DataFrame(simplified_flights)
+    return pd.DataFrame(extract_flights)

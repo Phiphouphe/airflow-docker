@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
