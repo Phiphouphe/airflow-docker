@@ -15,7 +15,7 @@ import app.helper as helper
 from app.tasks.Extract.API_extraction import API_extraction
 from app.tasks.Extract.API_extraction2 import API_extraction2
 from app.tasks.Transform.API_transform_data import API_transform_data
-from app.tasks.Transform.Parquet_add_technical_info import Parquet_add_technical_info
+from app.tasks.Transform.TechnicalInfo import TechnicalInfo
 from app.tasks.Load.Parquet_to_snapshot import Parquet_to_snapshot
 from app.tasks.Load.Parquet_to_snapshot2 import Parquet_to_snapshot2
 from app.static.extract_flights import extract_flights
@@ -90,37 +90,18 @@ with DAG(
 
         task_extract_API_raw_flights >> task_extract_API_scheduled_flights
 
-    # with TaskGroup('transformation') as transformation:
-    #     # Transformation des données extraites de l'API pour le fichier raw (vols de la veille)
-    #     task_transform_raw_flights = API_transform_data(
-    #         input_parquet_file="task_extract_API_raw_flight",
-    #         output_parquet_file="task_transform_raw_flights",
-    #         transform_function=extract_flights,
-    #         task_id="task_transform_raw_flights",
-    #     )
-
-    #     # Transformation des données extraites de l'API pour le fichier scheduled (vols du jour même)
-    #     task_transform_scheduled_flights = API_transform_data(
-    #         input_parquet_file="task_extract_API_scheduled_flight",
-    #         output_parquet_file="task_transform_scheduled_flights",
-    #         transform_function=extract_flights,
-    #         task_id="task_transform_scheduled_flights",
-    #     )
-
-    #     [task_transform_raw_flights, task_transform_scheduled_flights]
-
     with TaskGroup('technical_informations') as technical_informations:
         # Ajout des informations techniques pour le fichier raw
-        task_add_technical_info_raw = Parquet_add_technical_info(
-            input_parquet_file="task_extract_API_raw_flights", 
-            output_parquet_file="task_add_technical_info_raw",
+        task_add_technical_info_raw = TechnicalInfo(
+            input_file="task_extract_API_raw_flights", 
+            output_file="task_add_technical_info_raw",
             task_id="task_add_technical_info_raw", 
         )
 
         # Ajout des informations techniques pour le fichier scheduled
-        task_add_technical_info_scheduled = Parquet_add_technical_info(
-            input_parquet_file="task_extract_API_scheduled_flights", 
-            output_parquet_file="task_add_technical_info_scheduled", 
+        task_add_technical_info_scheduled = TechnicalInfo(
+            input_file="task_extract_API_scheduled_flights", 
+            output_file="task_add_technical_info_scheduled", 
             task_id="task_add_technical_info_scheduled", 
         )
 
@@ -138,9 +119,9 @@ with DAG(
             task_id="task_load_raw_to_db",
         )
 
-        # Chargement du fichier scheduled dans la table raw_scheduled_flights
+        # Chargement du fichier scheduled dans la table scheduled_flights
         task_load_scheduled_to_db = Parquet_to_snapshot2(
-            table_name="raw_scheduled_flights",
+            table_name="scheduled_flights",
             schema="raw",
             mode="scheduled",
             api_type="airfrance",

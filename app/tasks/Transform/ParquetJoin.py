@@ -18,6 +18,8 @@ class ParquetJoin(PythonOperator):
         output_file: str,
         on: dict,
         how: str = "left",
+        drop_right_keys: bool = False,
+        rename_right: dict = None,
         task_id: str = "ParquetPandasJoin",
         execution_timeout: timedelta = timedelta(minutes=10),
         **kwargs
@@ -30,6 +32,8 @@ class ParquetJoin(PythonOperator):
         - right_file (str) : chemin du fichier Parquet de droite
         - on (dict) : dictionnaire de colonnes à joindre {col_left: col_right}
         - how (str) : type de jointure (left / inner / right / outer). Par défaut : left
+        - drop_right_keys (bool) : si True, les colonnes de jointure du fichier de droite seront supprimées du résultat. Par défaut : False
+        - rename_right (dict) : dictionnaire de renommage des colonnes du fichier de droite après jointure {col_right: new_col_name}. Par défaut : None (pas de renommage)
         - output_file (str) : chemin de sortie du résultat (temporaire)
         - task_id (str) : ID de la tâche Airflow
         - execution_timeout (timedelta) : durée maximale d'exécution de la tâche
@@ -40,6 +44,8 @@ class ParquetJoin(PythonOperator):
         self._on = on
         self._how = how
         self._output_file = output_file
+        self._drop_right_keys = drop_right_keys
+        self._rename_right = rename_right or {}
 
         super().__init__(
             task_id=task_id,
@@ -73,6 +79,10 @@ class ParquetJoin(PythonOperator):
         logging.info(f"Left shape : {df_left.shape}")
         logging.info(f"Right shape : {df_right.shape}")
 
+        # Renommer les colonnes de droite si nécessaire
+        if self._rename_right:
+            df_right = df_right.rename(columns=self._rename_right)
+
         # Préparer les listes de colonnes
         left_cols = list(self._on.keys())
         right_cols = list(self._on.values())
@@ -84,6 +94,10 @@ class ParquetJoin(PythonOperator):
             right_on=right_cols,
             how=self._how,
         )
+
+        # Supprimer les colonnes clés de droite si demandé
+        if self._drop_right_keys:
+            df_result.drop(columns=list(self._on.values()), inplace=True)
 
         logging.info(f"Résultat shape : {df_result.shape}")
 

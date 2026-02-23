@@ -65,7 +65,7 @@ class ApplyFunction(PythonOperator):
                 continue
 
             try:
-                df[new_col] = func(df, *self._args, **self._kwargs)
+                df[new_col] = df.apply(lambda row: func(row, *self._args, **self._kwargs), axis=1)
                 logging.info(f"✅ Colonne '{new_col}' créée avec succès.")
 
                 # Contrôle des valeurs nulles pour la nouvelle colonne
@@ -74,6 +74,8 @@ class ApplyFunction(PythonOperator):
                     columns=[new_col],
                     threshold_percent=self._threshold_percent,
                 )
+
+                logging.info(f"Colonnes après ApplyFunction : {df.columns.tolist()}")
 
             except Exception as e:
                 raise AirflowFailException(

@@ -8,39 +8,39 @@ from airflow.operators.python import PythonOperator
 import app.helper as helper
 
 
-class Parquet_add_technical_info(PythonOperator):
+class TechnicalInfo(PythonOperator):
 
     def __init__(
         self,
         task_id: str = "add_technical_info",
-        input_parquet_file: str = None, 
+        input_file: str = None, 
         date_column: str = "date_photo",  
         year_column: str = "annee_photo",
         week_column: str = "semaine_photo",
         instance_column: str = "instance_id",  
         execution_date_column: str = "execution_date",
-        output_parquet_file: str = None,
+        output_file: str = None,
         **kwargs,
     ) -> None:
-        """Tâche Airflow permettant d'ajouter des informations techniques (date d'exécution et identifiant d'instance) à un fichier Parquet.
+        """Tâche Airflow permettant d'ajouter des informations techniques (date d'exécution et identifiant d'instance) à un fichier Parquet ou CSV.
 
         Args:
             task_id (str, optional): Identifiant unique pour la tâche dans le DAG. Defaults to "add_technical_info".
-            input_parquet_file (str, optional): Chemin du fichier Parquet cible. Defaults to None.
+            input_file (str, optional): Chemin du fichier cible. Defaults to None.
             date_column (str, optional): Nom de la colonne pour la date d'exécution. Defaults to "date_photo".
             year_column (str, optional): Nom de la colonne pour l'année d'exécution. Defaults to "annee_photo".
             week_column (str, optional): Nom de la colonne pour la semaine d'exécution. Defaults to "semaine_photo".
             instance_column (str, optional): Nom de la colonne pour l'identifiant d'instance. Defaults to "instance_id".
             execution_date_column (str, optional): Nom de la colonne pour la date d'éxecution du DAG. Defaults to "execution_date".
-            output_parquet_file (str, optional): Chemin du fichier Parquet de sortie. Defaults to None.
+            output_file (str, optional): Chemin du fichier de sortie. Defaults to None.
         """
 
-        self.__input_parquet_file = input_parquet_file
+        self.__input_file = input_file
         self.__date_column = date_column.lower()
         self.__year_column = year_column.lower()
         self.__week_column = week_column.lower()
         self.__instance_column = instance_column
-        self.__output_parquet_file = output_parquet_file
+        self.__output_file = output_file
         self.__execution_date_column = execution_date_column
 
         super().__init__(
@@ -53,7 +53,7 @@ class Parquet_add_technical_info(PythonOperator):
     def _run(self, **context):
         """Ajoute les informations techniques au Parquet et génère le fichier de sortie."""
 
-        df = helper.load_parquet_to_df(self.dag_id, self.__input_parquet_file)
+        df = helper.load_parquet_to_df(self.dag_id, self.__input_file)
 
         # Récupérer le contexte de l'exécution
         instance_id = context["run_id"]
@@ -85,6 +85,6 @@ class Parquet_add_technical_info(PythonOperator):
         logging.info(f"📊 Aperçu des premières lignes après modification :\n{df.head().to_string()}")
 
         # Sauvegarder le résultatdans un nouveau fichier Parquet
-        helper.generate_parquet_to_temp(self.dag_id, df, self.__output_parquet_file)
+        helper.generate_parquet_to_temp(self.dag_id, df, self.__output_file)
 
-        return self.__output_parquet_file
+        return self.__output_file

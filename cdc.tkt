@@ -73,31 +73,35 @@ Jeudi : Analytics
 - A TESTER. Nettoyage des tables à joindre (meteo + iata) : raw -> ajouter groupe + technical info / staging / analytics
 - A TESTER. Enrichissement/jointures
 - Calculs et KPIs
+
+Dans Power BI : 
 1️⃣ KPI (Key Performance Indicator)
 Indicateurs clés pour mesurer la performance ou la qualité des vols :
 avg_delay_minutes → délai moyen par compagnie ou aéroport.
 pct_flights_on_time → % de vols à l’heure (retard ≤ 15 min).
 nb_flights_cancelled → nombre de vols annulés par jour ou par aéroport.
 avg_flight_duration → durée moyenne réelle vs prévue.
-2️⃣ Flags (booléens pour signaler un événement)
-Colonnes indicatrices qui facilitent le filtrage ou le regroupement :
-is_delayed → True si delay_minutes > 15.
-is_major_delay → True si delay_minutes > 60.
-is_landed → True si actual_arrival est renseigné.
-has_wifi → True si le vol dispose du wifi.
-is_cancelled → True si status indique annulation.
 3️⃣ Agrégations
 Résumé ou consolidation des données par dimension :
 total_flights_per_day → nombre de vols par jour.
 avg_delay_per_airline → délai moyen par compagnie.
 sum_delay_per_airport → total des minutes de retard par aéroport.
 count_flights_by_status → vols on_time / delayed / cancelled.
+
+En base de données :
+2️⃣ Flags (booléens pour signaler un événement)
+Colonnes indicatrices qui facilitent le filtrage ou le regroupement :
+is_delayed → True si delay_minutes > 15. 
+is_major_delay → True si delay_minutes > 60.
+is_cancelled → True si status indique annulation.
+is_landed → True si actual_arrival est renseigné. 
+has_wifi → True si le vol dispose du wifi ? Déjà appliqué en statging
 4️⃣ Catégorisation
 Transformer une valeur continue en classes pour l’analyse ou la visualisation :
-delay_category → "on_time", "minor_delay" (1–15 min), "major_delay" (>15 min).
-flight_duration_category → "short", "medium", "long" selon durée prévue.
+delay_category → "on_time", "minor_delay" (1–15 min), "major_delay" (>15 min). 
 departure_time_block → "morning", "afternoon", "evening", "night" selon heure de départ.
-airport_traffic_level → "low", "medium", "high" selon nombre de vols par jour.
+flight_duration_category → "short", "medium", "long" selon durée prévue ? Peu pertinent
+airport_traffic_level → "low", "medium", "high" selon nombre de vols par jour ? Peu pertinent
 - A TESTER. Créer nouvelle colonne avec fonction (classe applyfunction)
 - A TESTER. Dédupliquer avec VersionSelector()
 
