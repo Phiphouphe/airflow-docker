@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.static.extract_weather import extract_daily_weather
 from app.tasks.Extract.API_extraction2 import API_extraction2
-from app.tasks.Transform.Parquet_add_technical_info import Parquet_add_technical_info
+from app.tasks.Transform.TechnicalInfo import TechnicalInfo
 from app.tasks.Load.Parquet_to_snapshot2 import Parquet_to_snapshot2
 
 
@@ -98,16 +98,16 @@ with DAG(
 
         for iata, coords in cities.items():
             # Ajout des informations techniques pour le fichier raw
-            task_add_technical_info_raw = Parquet_add_technical_info(
-                input_parquet_file=f"task_extract_weather_raw_{iata}", 
-                output_parquet_file=f"task_add_technical_info_raw_{iata}",
+            task_add_technical_info_raw = TechnicalInfo(
+                input_file=f"task_extract_weather_raw_{iata}", 
+                output_file=f"task_add_technical_info_raw_{iata}",
                 task_id=f"task_add_technical_info_raw_{iata}", 
             )
 
             # Ajout des informations techniques pour le fichier scheduled
-            task_add_technical_info_scheduled = Parquet_add_technical_info(
-                input_parquet_file=f"task_extract_weather_scheduled_{iata}", 
-                output_parquet_file=f"task_add_technical_info_scheduled_{iata}", 
+            task_add_technical_info_scheduled = TechnicalInfo(
+                input_file=f"task_extract_weather_scheduled_{iata}", 
+                output_file=f"task_add_technical_info_scheduled_{iata}", 
                 task_id=f"task_add_technical_info_scheduled_{iata}", 
             )
 
@@ -128,9 +128,9 @@ with DAG(
                     task_id=f"task_load_raw_{iata}_to_db",
             )
 
-            # Chargement du fichier scheduled dans la table raw_scheduled_weather
+            # Chargement du fichier scheduled dans la table scheduled_weather
             task_load_scheduled_to_db = Parquet_to_snapshot2(
-                    table_name="raw_scheduled_weather",
+                    table_name="scheduled_weather",
                     schema="raw",
                     mode="scheduled",
                     api_type="openmeteo",
