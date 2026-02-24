@@ -18,7 +18,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.Transform.TechnicalInfo import TechnicalInfo
-from app.tasks.ML.MLrawDB import MLrawDB
+from app.tasks.ML.MLTrainTask import MLTrainTask
 
 
 # Définition du DAG
@@ -51,7 +51,7 @@ with DAG(
         """
 ) as dag:
     
-    # Features
+    # Features 
     features = [
         "origin_airport", "destination_airport", "departure_time_block",
         "day_of_week", "month", "dep_hour", "arr_hour", "is_cancelled"
@@ -59,6 +59,7 @@ with DAG(
     categorical_features = ["origin_airport", "destination_airport", "departure_time_block"]
     numeric_features = ["day_of_week", "month", "dep_hour", "arr_hour"]
 
+    # Preprocessor pour les modèles ML
     preprocessor = ColumnTransformer([
         ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features),
         ("num", StandardScaler(), numeric_features)
@@ -139,7 +140,7 @@ with DAG(
         task_id="task_technical_informations",
     )
 
-    task_training_models_ml = MLrawDB(
+    task_training_models_ml = MLTrainTask(
         input_file="task_technical_informations",
         features=features,
         target="is_delayed",

@@ -105,8 +105,8 @@ departure_time_block → "morning", "afternoon", "evening", "night" selon heure 
 
 
 TO DO : ML
-- Comprendre la classe et DAG ML
-- Mettre en place le GridSearch
+- Comprendre la classe et DAG ML. OK
+- Mettre en place le GridSearch. OK
 - Appliquer le ML sur scheduled dans un DAG
 
 

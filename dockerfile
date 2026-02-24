@@ -1,15 +1,17 @@
-# Dockerfile
-FROM python:3.12-slim
+# Base image
+FROM apache/airflow:3.1.5
 
-# Définir le répertoire de travail dans le conteneur
-WORKDIR /app
+# Passer en root pour installer les packages
+USER root
 
-# Copier ton script et les fichiers nécessaires
-COPY requirements.txt .
-COPY flight_loader.py .
+# Installer les packages ML nécessaires
+RUN pip install --no-cache-dir \
+    pandas==2.1.4 \
+    scikit-learn==1.8.0 \
+    xgboost==3.2.0 \
+    requests \
+    psycopg2-binary \
+    pyarrow
 
-# Installer les dépendances
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Commande par défaut pour exécuter ton script
-CMD ["python", "flight_loader.py"]
+# Revenir à l'utilisateur airflow
+USER airflow

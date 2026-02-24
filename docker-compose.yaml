@@ -49,7 +49,8 @@ x-airflow-common:
   # In order to add custom dependencies or upgrade provider distributions you can use your extended image.
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.5}
+  build: .
+  # image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.5}
   # build: .
   env_file:
     - ${ENV_FILE_PATH:-.env}
@@ -82,6 +83,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/app:/opt/airflow/app
     - ${AIRFLOW_PROJ_DIR:-.}/temp:/opt/airflow/temp
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
+    - ${AIRFLOW_PROJ_DIR:-.}/models:/opt/airflow/models
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -128,9 +130,9 @@ services:
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
@@ -158,9 +160,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
@@ -198,9 +200,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
