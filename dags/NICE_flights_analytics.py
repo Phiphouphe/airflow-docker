@@ -2,6 +2,8 @@ import pandas as pd
 import sys
 import os
 import pendulum
+import logging
+import calendar
 
 from datetime import timedelta
 from airflow import DAG
@@ -249,6 +251,70 @@ with DAG(
 
     with TaskGroup('apply_business_functions') as apply_business_functions:
 
+        ## Colonnes temporelles pour ML
+        # Fonction qui calcule le jour de la semaine à partir de la date du vol
+        def compute_day_of_week(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                day_num = pd.to_datetime(row["date"]).dayofweek  # 0 = lundi
+                return day_num + 1  # 1 = lundi, …, 7 = dimanche
+            except Exception as e:
+                logging.warning(f"Erreur compute_day_of_week_one_index pour row {row.name}: {e}")
+                return None
+
+        # Fonction qui calcule le mois à partir de la date du vol
+        def compute_month(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                return pd.to_datetime(row["date"]).month
+            except Exception as e:
+                logging.warning(f"Erreur compute_month pour row {row.name}: {e}")
+                return None
+
+        # Fonction qui calcule l'heure de départ prévue à partir de la colonne "scheduled_departure"
+        def compute_dep_hour(row):
+            try:
+                if pd.isna(row["scheduled_departure"]):
+                    return None
+                return pd.to_datetime(row["scheduled_departure"]).hour
+            except Exception as e:
+                logging.warning(f"Erreur compute_dep_hour pour row {row.name}: {e}")
+                return None
+
+        # Fonction qui calcule l'heure d'arrivée prévue à partir de la colonne "scheduled_arrival"
+        def compute_arr_hour(row):
+            try:
+                if pd.isna(row["scheduled_arrival"]):
+                    return None
+                return pd.to_datetime(row["scheduled_arrival"]).hour
+            except Exception as e:
+                logging.warning(f"Erreur compute_arr_hour pour row {row.name}: {e}")
+                return None
+            
+        ## Colonnes lisibles pour reporting
+        def compute_day_name(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                day_num = pd.to_datetime(row["date"]).dayofweek  # 0 = lundi
+                return calendar.day_name[day_num]               # "Monday", "Tuesday", ...
+            except Exception as e:
+                logging.warning(f"Erreur compute_day_name pour row {row.name}: {e}")
+                return None
+
+        def compute_month_name(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                month_num = pd.to_datetime(row["date"]).month    # 1 = janvier
+                return calendar.month_name[month_num]           # "January", "February", ...
+            except Exception as e:
+                logging.warning(f"Erreur compute_month_name pour row {row.name}: {e}")
+                return None
+        
+        ## Colonne métier
         # Fonction qui calcule le retard des avions en minutes à leur arrivée
         def compute_delay_minutes(row):
             if (
@@ -264,6 +330,12 @@ with DAG(
             input_file="task_remove_columns_raw_flights",
             output_file="task_apply_functions_raw_flights",
             columns_functions = {
+                "day_of_week": compute_day_of_week,
+                "month": compute_month,
+                "dep_hour": compute_dep_hour,
+                "arr_hour": compute_arr_hour,
+                "day_name": compute_day_name,
+                "month_name": compute_month_name,
                 "delay_minutes": compute_delay_minutes,
                 "delay_category": lambda row: (
                     None if pd.isna(row["delay_minutes"])
@@ -285,7 +357,8 @@ with DAG(
                     pd.notna(row["delay_minutes"]) and row["delay_minutes"] > 60
                 ),
                 "is_cancelled": lambda row: row["status"] == "CANCELLED",
-                "is_landed": lambda row: row["status"] == "ARRIVED",},
+                "is_landed": lambda row: row["status"] == "ARRIVED",
+                },
             task_id="task_apply_functions_raw_flights",
         )
 
@@ -294,6 +367,12 @@ with DAG(
             input_file="task_remove_columns_scheduled_flights",
             output_file="task_apply_functions_scheduled_flights",
             columns_functions = {
+                "day_of_week": compute_day_of_week,
+                "month": compute_month,
+                "dep_hour": compute_dep_hour,
+                "arr_hour": compute_arr_hour,
+                "day_name": compute_day_name,
+                "month_name": compute_month_name,
                 "departure_time_block": lambda row: (
                     None if pd.isna(row["scheduled_departure"])
                     else "night" if 0 <= row["scheduled_departure"].hour < 6
@@ -385,4 +464,4 @@ with DAG(
     # Définition des dépendances entre les tâches
     # Les données de vol "raw" et "scheduled" suivent des chemins parallèles d'extraction, de transformation et de chargement.
 
-    extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> version_selector >> loading
+    extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> technical_informations >> version_selector >> loading
