@@ -4,3 +4,4 @@ pandas
 pyarrow
 scikit-learn
 xgboost
+mlflow

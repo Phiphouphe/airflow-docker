@@ -1,11 +1,9 @@
-import pandas as pd
 import sys
 import os
 import pendulum
 
 from datetime import timedelta
 from airflow import DAG
-from airflow.utils.task_group import TaskGroup
 from airflow.datasets import Dataset
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
@@ -22,7 +20,7 @@ from app.tasks.ML.MLTrainTask import MLTrainTask
 
 
 # Définition du DAG
-DAG_ID = "ML_training_raw"
+DAG_ID = "ML_training_raw_flights"
 LIBELLE = "Entraînement de modèles ML sur les données brutes de vol"
 DESCRIPTION = "Entraînement de modèles ML sur les données brutes de vol depuis la table 'raw_flights' dans la base de données flight_dw."
 
@@ -47,7 +45,7 @@ with DAG(
     dagrun_timeout=timedelta(minutes=10),
     description=DESCRIPTION,
     doc_md="""
-            Entraînement de modèles ML sur les données brutes de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis la table 'raw_flights' dans la base de données flight_dw.
+            Entraînement de modèles ML sur les données brutes de vol de la veille (raw) depuis la table 'raw_flights' dans la base de données flight_dw.
         """
 ) as dag:
     

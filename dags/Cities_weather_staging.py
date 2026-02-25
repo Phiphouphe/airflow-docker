@@ -169,7 +169,7 @@ with DAG(
             schema="staging",
             mode="raw",
             api_type="openmeteo",
-            input_parquet_file="task_duplicate_remover_raw_weather",
+            input_parquet_file="task_add_technical_info_raw_weather",
             database_conn_id="flight_dw_postgres",
             task_id="task_load_raw_to_db",
         )
@@ -180,7 +180,7 @@ with DAG(
             schema="staging",
             mode="scheduled",
             api_type="openmeteo",
-            input_parquet_file="task_duplicate_remover_scheduled_weather",
+            input_parquet_file="task_add_technical_info_scheduled_weather",
             database_conn_id="flight_dw_postgres",
             task_id="task_load_scheduled_to_db",
         )

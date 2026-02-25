@@ -1,5 +1,9 @@
 import logging
 import joblib
+import os
+
+import mlflow
+import mlflow.sklearn
 
 import app.helper as helper
 
@@ -64,6 +68,10 @@ class MLTrainTask(PythonOperator):
                 X, y, test_size=self._test_size, random_state=42
             )
 
+            # Set MLflow experiment
+            mlflow.set_tracking_uri("file:///opt/airflow/mlruns")
+            mlflow.set_experiment("Flight Delay Prediction")
+
             # Entraîner les modèles et évaluer leurs performances
             results = []
             for name, model in self._models.items():
@@ -76,7 +84,33 @@ class MLTrainTask(PythonOperator):
 
             # Sélection du meilleur modèle
             best = max(results, key=lambda x: x["score"])
-            model_path = f"{self._model_dir}/{best['model_name']}_pipeline.pkl"
+            os.makedirs(self._model_dir, exist_ok=True)
+            model_path = f"{self._model_dir}/best_model.pkl"
+
+            # Sauvegarde du pipeline sur disque (pour compatibilité)
+            joblib.dump(best["model_object"], model_path)
+            logging.info(f"✅ Meilleur modèle sauvegardé : {model_path}")
+
+            # Log the best model to MLflow
+            with mlflow.start_run(run_name=f"{best['model_name']}_best_model_run"):
+                mlflow.log_param("model_type", best["model_name"])
+                mlflow.log_param("features", str(self._features))
+                mlflow.log_param("target", self._target)
+                mlflow.log_param("test_size", self._test_size)
+                mlflow.log_metric("test_accuracy", best["score"])
+                mlflow.sklearn.log_model(best["model_object"], "model")
+
+                # Register the model in MLflow Registry
+                model_uri = f"runs:/{mlflow.active_run().info.run_id}/model"
+                mlflow.register_model(model_uri, "flight_delay_model")
+
+            # Retourne un XCom (retour natif de PythonOperator)
+            return {"model_name": best["model_name"], "model_path": model_path, "score": best["score"]}
+
+            # Sélection du meilleur modèle
+            best = max(results, key=lambda x: x["score"])
+            os.makedirs(self._model_dir, exist_ok=True)
+            model_path = f"{self._model_dir}/best_model.pkl"
 
             # Sauvegarde du pipeline sur disque
             joblib.dump(best["model_object"], model_path)
