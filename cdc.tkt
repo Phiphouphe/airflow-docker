@@ -104,12 +104,10 @@ departure_time_block → "morning", "afternoon", "evening", "night" selon heure 
 - A TESTER. Dédupliquer avec VersionSelector()
 
 
-TO DO : ML
-- Comprendre la classe et DAG ML. OK
-- Mettre en place le GridSearch. OK
-- Appliquer le ML sur scheduled dans un DAG
 
 
 Next step : ML
-- Installation MLFlow
-- Versionner et lancer avec MLFlow
+- ML Flow Tracking à Vérifier
+- ML Models
+- ML Registry
+

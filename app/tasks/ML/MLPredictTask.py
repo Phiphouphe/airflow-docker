@@ -1,5 +1,5 @@
 import logging
-import joblib
+import pandas as pd
 
 import mlflow
 
@@ -81,8 +81,8 @@ class MLPredictTask(PythonOperator):
                 mlflow.log_param("input_file", self._input_file)
                 mlflow.log_param("num_predictions", len(predictions))
                 mlflow.log_param("features", str(self._features))
+
                 # Log predictions as artifact or metric
-                import pandas as pd
                 pred_df = pd.DataFrame({"predictions": predictions})
                 pred_df.to_csv("/tmp/predictions.csv", index=False)
                 mlflow.log_artifact("/tmp/predictions.csv", "predictions")

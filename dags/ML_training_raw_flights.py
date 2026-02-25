@@ -16,7 +16,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.Transform.TechnicalInfo import TechnicalInfo
+
 from app.tasks.ML.MLTrainTask import MLTrainTask
+from airflow.datasets import Dataset
 
 
 # Définition du DAG
@@ -24,7 +26,10 @@ DAG_ID = "ML_training_raw_flights"
 LIBELLE = "Entraînement de modèles ML sur les données brutes de vol"
 DESCRIPTION = "Entraînement de modèles ML sur les données brutes de vol depuis la table 'raw_flights' dans la base de données flight_dw."
 
+# Dataset de la table en entrée
 raw_flights_table = Dataset("postgres://postgres_api/flight_dw/analytics/raw_flights")
+# Dataset de sortie pour le modèle entraîné 
+ml_model_dataset = Dataset("file:///mlflow/models/latest")
 
 
 default_args = {
@@ -138,13 +143,15 @@ with DAG(
         task_id="task_technical_informations",
     )
 
+
     task_training_models_ml = MLTrainTask(
         input_file="task_technical_informations",
         features=features,
         target="is_delayed",
         models=models_dict,
         task_id="task_training_models_ml",
-        )
+        outlets=[ml_model_dataset],
+    )
 
     # Définition de l'ordre d'exécution
     task_extract_db >> task_technical_informations >> task_training_models_ml

@@ -11,7 +11,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.Transform.TechnicalInfo import TechnicalInfo
-from app.tasks.ML.MLPredictTask import MLPredictTask 
+
+from app.tasks.ML.MLPredictTask import MLPredictTask
 
 
 # Définition du DAG
@@ -19,7 +20,11 @@ DAG_ID = "ML_predict_scheduled_flights"
 LIBELLE = "Prédiction de retards de vols programmés"
 DESCRIPTION = "Prédiction de retards de vols programmés à partir des données brutes de la table 'scheduled_flights' dans la base de données flight_dw."
 
+
+# Dataset de la table en entrée
 scheduled_flights_table = Dataset("postgres://postgres_api/flight_dw/analytics/scheduled_flights")
+# Dataset de sortie pour le modèle ML entraîné (doit être identique à celui déclaré dans le training)
+ml_model_dataset = Dataset("file:///mlflow/models/latest")
 
 default_args = {
     "owner": "airflow",
@@ -29,11 +34,12 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
+
 with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule=[scheduled_flights_table,],
+    schedule=[scheduled_flights_table, ml_model_dataset,],
     tags=["FLIGHTS","ML", "PREDICTION", "SCHEDULED"],
     catchup=False,
     max_active_runs=1,
@@ -98,6 +104,7 @@ with DAG(
         task_id="task_technical_informations",
     )
 
+
     task_predict_ml = MLPredictTask(
         input_file="task_technical_informations",
         features=[
@@ -110,7 +117,7 @@ with DAG(
             "arr_hour",
             "is_cancelled"
         ],
-        task_id="task_predict_ml",   
+        task_id="task_predict_ml",
     )
 
     # Définition des dépendances

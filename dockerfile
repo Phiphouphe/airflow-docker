@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir \
     scikit-learn==1.4.0 \
     requests \
     psycopg2-binary \
-    pyarrow
+    pyarrow \
+    mlflow==2.12.1
 
 RUN pip install --no-cache-dir --no-build-isolation xgboost==1.7.6

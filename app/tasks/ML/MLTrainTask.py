@@ -107,17 +107,5 @@ class MLTrainTask(PythonOperator):
             # Retourne un XCom (retour natif de PythonOperator)
             return {"model_name": best["model_name"], "model_path": model_path, "score": best["score"]}
 
-            # Sélection du meilleur modèle
-            best = max(results, key=lambda x: x["score"])
-            os.makedirs(self._model_dir, exist_ok=True)
-            model_path = f"{self._model_dir}/best_model.pkl"
-
-            # Sauvegarde du pipeline sur disque
-            joblib.dump(best["model_object"], model_path)
-            logging.info(f"✅ Meilleur modèle sauvegardé : {model_path}")
-
-            # Retourne un XCom (retour natif de PythonOperator)
-            return {"model_name": best["model_name"], "model_path": model_path, "score": best["score"]}
-
         except Exception as e:
             raise AirflowFailException(f"Erreur MLTrainTask {self.task_id}: {e}")
