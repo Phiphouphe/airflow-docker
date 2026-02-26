@@ -1,0 +1,16 @@
+artifact_uri: /mlruns/422796191039500935/d89fd28b40404116a16f657671b96913/artifacts
+deleted_time: 1772065811913
+end_time: 1772063635170
+entry_point_name: ''
+experiment_id: '422796191039500935'
+lifecycle_stage: deleted
+run_id: d89fd28b40404116a16f657671b96913
+run_name: hilarious-stoat-181
+run_uuid: d89fd28b40404116a16f657671b96913
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772063635148
+status: 3
+tags: []
+user_id: root

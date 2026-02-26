@@ -1,0 +1,16 @@
+artifact_uri: /mlruns/422796191039500935/7a1ba6f0387e4a449df44d562c13c795/artifacts
+deleted_time: 1772065811913
+end_time: 1772063873318
+entry_point_name: ''
+experiment_id: '422796191039500935'
+lifecycle_stage: deleted
+run_id: 7a1ba6f0387e4a449df44d562c13c795
+run_name: adventurous-mink-695
+run_uuid: 7a1ba6f0387e4a449df44d562c13c795
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772063870542
+status: 4
+tags: []
+user_id: default

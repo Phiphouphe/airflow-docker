@@ -22,14 +22,14 @@ class MLTrainTask(PythonOperator):
         target: str,
         models: dict,
         test_size: float = 0.2,
-        model_dir: str = "/opt/airflow/models",
+        model_dir: str = "/opt/airflow/mlruns",
         task_id: str = "ml_train_task",
         execution_timeout: timedelta = timedelta(minutes=20),
         **kwargs_op,
         ):
         """
         Entraîne plusieurs modèles ML sur une table historique Postgres,
-        sélectionne le meilleur modèle et renvoie XCom.
+        sélectionne le meilleur modèle et renvoie XCom et résultats sur MLFlow.
 
         Arguments:
         - input_file (str): Chemin du fichier source.
@@ -65,22 +65,47 @@ class MLTrainTask(PythonOperator):
             y = df[self._target]
 
             X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=self._test_size, random_state=42
+                X, y, test_size=self._test_size, random_state=42, stratify=y,
             )
 
             # Set MLflow experiment
-            mlflow.set_tracking_uri("file:///opt/airflow/mlruns")
-            mlflow.set_experiment("Flight Delay Prediction")
+            mlflow.set_tracking_uri("http://mlflow:5000")
+            experiment_name = "Flight_Delay_Prediction"
+            if not mlflow.get_experiment_by_name(experiment_name):
+                mlflow.create_experiment(
+                    experiment_name,
+                    artifact_location="mlflow-artifacts:/Flight_Delay_Prediction"
+                )
+            mlflow.set_experiment(experiment_name)
 
-            # Entraîner les modèles et évaluer leurs performances
+            # Entraîner, évaluer et logger tous les modèles dans MLflow
             results = []
             for name, model in self._models.items():
-                logging.info(f"Entraînement du modèle {name}...")
-                model.fit(X_train, y_train)
-                score = model.score(X_test, y_test)
-                logging.info(f"📊 {name} score: {score}")
+                try:
+                    logging.info(f"Entraînement du modèle {name}...")
+                    model.fit(X_train, y_train)
+                    score = model.score(X_test, y_test)
+                    logging.info(f"📊 {name} score: {score}")
 
-                results.append({"model_name": name, "score": score, "model_object": model})
+                    # Log MLflow pour chaque modèle
+                    run_name = f"{name}_run"
+                    artifact_path = f"{name.lower()}_flight_delay"
+                    with mlflow.start_run(run_name=run_name):
+                        mlflow.log_param("model_type", name)
+                        mlflow.log_param("features", str(self._features))
+                        mlflow.log_param("target", self._target)
+                        mlflow.log_param("test_size", self._test_size)
+                        mlflow.log_metric("test_accuracy", score)
+                        mlflow.sklearn.log_model(model, artifact_path)
+
+                    results.append({"model_name": name, "score": score, "model_object": model})
+
+                except Exception as e:
+                    logging.warning(f"⚠️ Modèle {name} ignoré : {e}")
+                    continue
+
+            if not results:
+                raise AirflowFailException(f"Erreur MLTrainTask {self.task_id}: Aucun modèle n'a pu être entraîné.")
 
             # Sélection du meilleur modèle
             best = max(results, key=lambda x: x["score"])
@@ -91,21 +116,18 @@ class MLTrainTask(PythonOperator):
             joblib.dump(best["model_object"], model_path)
             logging.info(f"✅ Meilleur modèle sauvegardé : {model_path}")
 
-            # Log the best model to MLflow
-            with mlflow.start_run(run_name=f"{best['model_name']}_best_model_run"):
-                mlflow.log_param("model_type", best["model_name"])
-                mlflow.log_param("features", str(self._features))
-                mlflow.log_param("target", self._target)
-                mlflow.log_param("test_size", self._test_size)
-                mlflow.log_metric("test_accuracy", best["score"])
-                mlflow.sklearn.log_model(best["model_object"], "model")
-
-                # Register the model in MLflow Registry
-                model_uri = f"runs:/{mlflow.active_run().info.run_id}/model"
+            # Enregistrer le meilleur modèle dans le Model Registry
+            run_name = f"{best['model_name']}_best_model_run"
+            artifact_path = f"{best['model_name'].lower()}_flight_delay"
+            with mlflow.start_run(run_name=run_name):
+                mlflow.sklearn.log_model(best["model_object"], artifact_path)
+                model_uri = f"runs:/{mlflow.active_run().info.run_id}/{artifact_path}"
                 mlflow.register_model(model_uri, "flight_delay_model")
 
             # Retourne un XCom (retour natif de PythonOperator)
             return {"model_name": best["model_name"], "model_path": model_path, "score": best["score"]}
 
+        except AirflowFailException:
+            raise
         except Exception as e:
             raise AirflowFailException(f"Erreur MLTrainTask {self.task_id}: {e}")

@@ -16,7 +16,7 @@ class MLPredictTask(PythonOperator):
         self,
         input_file: str,
         features: list,
-        model_dir: str = "/opt/airflow/models",
+        model_dir: str = "/opt/airflow/mlruns",
         task_id: str = "ML_predict_task",
         execution_timeout: timedelta = timedelta(minutes=10),
         **kwargs_op,
@@ -42,10 +42,17 @@ class MLPredictTask(PythonOperator):
         )
 
     def _run(self, **context):
+        
         try:
             # Set MLflow tracking
-            mlflow.set_tracking_uri("file:///opt/airflow/mlruns")
-            mlflow.set_experiment("Flight Delay Prediction")
+            mlflow.set_tracking_uri("http://mlflow:5000")
+            experiment_name = "Flight_Delay_Prediction"
+            if not mlflow.get_experiment_by_name(experiment_name):
+                mlflow.create_experiment(
+                    experiment_name,
+                    artifact_location="mlflow-artifacts:/Flight_Delay_Prediction"
+                )
+            mlflow.set_experiment(experiment_name)
 
             # Load the model from MLflow Registry (latest version)
             model_uri = "models:/flight_delay_model/latest"
@@ -55,7 +62,6 @@ class MLPredictTask(PythonOperator):
             classifier = pipeline.named_steps.get('classifier')
             if classifier:
                 model_name = type(classifier).__name__.replace('Classifier', '').replace('Regressor', '')
-                # Mapper vers les noms utilisés dans l'entraînement
                 name_mapping = {
                     'RandomForest': 'RandomForest',
                     'LogisticRegression': 'LogisticRegression',
@@ -74,20 +80,18 @@ class MLPredictTask(PythonOperator):
             logging.info(f"Prédictions calculées pour {len(predictions)} lignes")
 
             # Log to MLflow
-            mlflow.set_tracking_uri("file:///opt/airflow/mlruns")
-            mlflow.set_experiment("Flight Delay Prediction")
-            with mlflow.start_run(run_name=f"{model_name}_prediction_run"):
+            run_name = f"{model_name}_prediction_run"
+            artifact_path = f"{model_name.lower()}_flight_delay_predictions"
+            with mlflow.start_run(run_name=run_name):
                 mlflow.log_param("model_used", model_name)
                 mlflow.log_param("input_file", self._input_file)
                 mlflow.log_param("num_predictions", len(predictions))
                 mlflow.log_param("features", str(self._features))
 
-                # Log predictions as artifact or metric
                 pred_df = pd.DataFrame({"predictions": predictions})
                 pred_df.to_csv("/tmp/predictions.csv", index=False)
-                mlflow.log_artifact("/tmp/predictions.csv", "predictions")
+                mlflow.log_artifact("/tmp/predictions.csv", artifact_path)
 
-            # Retourner XCom sérialisable
             return {
                 "model_name": model_name,
                 "model_uri": model_uri,

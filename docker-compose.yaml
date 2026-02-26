@@ -65,6 +65,7 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    MLFLOW_TRACKING_URI: http://mlflow:5000
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -83,15 +84,6 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/app:/opt/airflow/app
     - ${AIRFLOW_PROJ_DIR:-.}/temp:/opt/airflow/temp
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
-    - ${AIRFLOW_PROJ_DIR:-.}/models:/opt/airflow/models
-    - ${AIRFLOW_PROJ_DIR:-.}/mlruns:/opt/airflow/mlruns
-  user: "${AIRFLOW_UID:-50000}:0"
-  depends_on:
-    &airflow-common-depends-on
-    redis:
-      condition: service_healthy
-    postgres:
-      condition: service_healthy
 
 services:
   postgres:
@@ -104,22 +96,20 @@ services:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 10s
-      retries: 5
-      start_period: 5s
+      interval: 30s
+      retries: 10
+      start_period: 30s
     restart: always
 
   redis:
-    # Redis is limited to 7.2-bookworm due to licencing change
-    # https://redis.io/blog/redis-adopts-dual-source-available-licensing/
     image: redis:7.2-bookworm
     expose:
       - 6379
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 30s
       timeout: 30s
-      retries: 50
+      retries: 10
       start_period: 30s
     restart: always
 
@@ -136,7 +126,10 @@ services:
       start_period: 60s
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
 
@@ -151,7 +144,10 @@ services:
       start_period: 30s
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
 
@@ -166,7 +162,10 @@ services:
       start_period: 60s
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
 
@@ -189,7 +188,10 @@ services:
       DUMB_INIT_SETSID: "0"
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
       airflow-apiserver:
         condition: service_healthy
       airflow-init:
@@ -206,7 +208,10 @@ services:
       start_period: 60s
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
 
@@ -315,7 +320,10 @@ services:
       - -c
       - airflow
     depends_on:
-      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   # You can enable flower by adding "--profile flower" option e.g. docker-compose --profile flower up
   # or by explicitly targeted on the command line e.g. docker-compose up flower.
@@ -335,7 +343,10 @@ services:
       start_period: 30s
     restart: always
     depends_on:
-      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
 
@@ -373,14 +384,31 @@ services:
 
   # ---------------- MLFlow ----------------
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.12.1
-    environment:
-      MLFLOW_PORT: ${MLFLOW_PORT}
+    build:
+      context: ./mlflow
+      dockerfile: dockerfile
+    container_name: mlflow
     ports:
-      - "${MLFLOW_PORT}:${MLFLOW_PORT}"
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=postgresql+psycopg2://mlflow:mlflow@postgres:5432/mlflow
+      - MLFLOW_ARTIFACT_ROOT=/mlflow/artifacts
     volumes:
-      - ${AIRFLOW_PROJ_DIR:-.}/mlruns:/mlruns
-    command: mlflow server --backend-store-uri /mlruns --default-artifact-root /mlruns --host 0.0.0.0 --port ${MLFLOW_PORT}
+      - mlflow_artifacts:/mlflow/artifacts
+    command: >
+      mlflow server 
+      --backend-store-uri postgresql+psycopg2://mlflow:mlflow@postgres:5432/mlflow
+      --default-artifact-root /mlflow/artifacts
+      --serve-artifacts 
+      --host 0.0.0.0
+      --port 5000
+      --allowed-hosts "*"
+      --cors-allowed-origins "*"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
 
   # # ---------------- API LOADER ----------------
   # api_loader:
@@ -392,7 +420,8 @@ services:
   #   depends_on:
   #     postgres_api:
   #       condition: service_healthy
-
+  
 volumes:
   postgres-db-volume:
   pg_data:
+  mlflow_artifacts:

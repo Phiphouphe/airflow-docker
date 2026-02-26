@@ -137,6 +137,7 @@ with DAG(
             task_id="task_extract_db",
         )
 
+
     task_technical_informations = TechnicalInfo(
         input_file="task_extract_db",
         output_file="task_technical_informations",

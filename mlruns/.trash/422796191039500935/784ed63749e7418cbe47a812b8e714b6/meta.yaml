@@ -1,0 +1,16 @@
+artifact_uri: /mlruns/422796191039500935/784ed63749e7418cbe47a812b8e714b6/artifacts
+deleted_time: 1772065811913
+end_time: 1772065702419
+entry_point_name: ''
+experiment_id: '422796191039500935'
+lifecycle_stage: deleted
+run_id: 784ed63749e7418cbe47a812b8e714b6
+run_name: legendary-donkey-365
+run_uuid: 784ed63749e7418cbe47a812b8e714b6
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772065697723
+status: 4
+tags: []
+user_id: default
