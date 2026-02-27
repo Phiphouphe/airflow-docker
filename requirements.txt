@@ -2,3 +2,6 @@ requests
 psycopg2-binary
 pandas
 pyarrow
+scikit-learn
+xgboost
+mlflow

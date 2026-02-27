@@ -1,19 +1,20 @@
 import pandas as pd
+import numpy as np
 
 from airflow.exceptions import AirflowFailException
 
-def simplify_flights(df: pd.DataFrame) -> pd.DataFrame:
+def extract_flights(df: pd.DataFrame) -> pd.DataFrame:
     if "operationalFlights" not in df.columns:
         raise AirflowFailException("❌ 'operationalFlights' introuvable dans le DataFrame")
     
     flights_series = df["operationalFlights"].explode().dropna()
-    simplified_flights = []
+    extract_flights = []
 
     for flight in flights_series:
         # prendre le dernier leg
         leg = flight["flightLegs"][-1]
 
-        simplified_flights.append({
+        extract_flights.append({
             "flight_id": flight["id"],
             "flight_number": flight["flightNumber"],
             "airline_code": flight["airline"]["code"],
@@ -34,4 +35,15 @@ def simplify_flights(df: pd.DataFrame) -> pd.DataFrame:
             "wifi_enabled": leg["aircraft"].get("wifiEnabled"),
         })
 
-    return pd.DataFrame(simplified_flights)
+    for f in extract_flights:
+        dc = f["delay_code"]
+        if dc is None:
+            f["delay_code"] = '{}'
+        elif isinstance(dc, list) or isinstance(dc, pd.Series) or isinstance(dc, pd.Index) or isinstance(dc, np.ndarray):
+            f["delay_code"] = '{' + ','.join(map(str, dc)) + '}'
+        elif isinstance(dc, str):
+            f["delay_code"] = '{' + dc + '}'
+        else:
+            f["delay_code"] = '{' + str(dc) + '}'
+
+    return pd.DataFrame(extract_flights)

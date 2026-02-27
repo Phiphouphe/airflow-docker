@@ -1,8 +1,7 @@
 import logging
-import requests
 import pandas as pd
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
@@ -30,9 +29,9 @@ class API_transform_data(PythonOperator):
         - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 30 secondes.
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "API_transform_data".
         """
-        self.input_file = input_parquet_file
-        self.output_file = output_parquet_file
-        self.transform_function = transform_function
+        self._input_file = input_parquet_file
+        self._output_file = output_parquet_file
+        self._transform_function = transform_function
         
         super().__init__(
             task_id=task_id,
@@ -44,15 +43,15 @@ class API_transform_data(PythonOperator):
     def _run(self):
 
         # Charger le parquet d'entrée
-        df = helper.load_parquet_to_df(self.dag.dag_id, self.input_file, have_file_security=True)
+        df = helper.load_parquet_to_df(self.dag.dag_id, self._input_file, have_file_security=True)
 
         # Voir les lignes avant transformation
-        print("Type après transformation", type(df))
-        print("Lignes après transformation", df.head(5))
+        print("Type avant transformation", type(df))
+        print("Lignes avant transformation", df.head(5))
 
         # Transformation des données (à partir de la fonction fournie)
         try:
-            df = self.transform_function(df)
+            df = self._transform_function(df)
             logging.info(f"✅ Transformation appliquée : {len(df)} lignes conservées.")
             logging.info(f"✅ Transformation appliquée avec succès.")
         except Exception as e:
@@ -67,5 +66,5 @@ class API_transform_data(PythonOperator):
         helper.generate_parquet_to_temp(
             self.dag.dag_id,
             df,
-            self.output_file,
+            self._output_file,
         )
