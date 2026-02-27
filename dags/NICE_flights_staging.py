@@ -209,14 +209,14 @@ with DAG(
         # Extraction des données météo pour le vol de la veille (raw) depuis la base de données
         task_add_technical_info_raw_flights = TechnicalInfo(
             input_file="task_duplicate_remover_raw_flights", 
-            output_file="task_add_technical_info_raw",
+            output_file="task_add_technical_info_raw_flights",
             task_id="task_add_technical_info_raw_flights", 
         )
 
         # Extraction des données météo pour le vol du jour même (scheduled) depuis la base de données
         task_add_technical_info_scheduled_flights = TechnicalInfo(
             input_file="task_duplicate_remover_scheduled_flights", 
-            output_file="task_add_technical_info_scheduled",
+            output_file="task_add_technical_info_scheduled_flights",
             task_id="task_add_technical_info_scheduled_flights", 
         )
 

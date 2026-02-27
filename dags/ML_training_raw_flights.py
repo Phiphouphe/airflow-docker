@@ -1,11 +1,9 @@
-import pandas as pd
 import sys
 import os
 import pendulum
 
 from datetime import timedelta
 from airflow import DAG
-from airflow.utils.task_group import TaskGroup
 from airflow.datasets import Dataset
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
@@ -18,15 +16,20 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.Transform.TechnicalInfo import TechnicalInfo
-from app.tasks.ML.MLrawDB import MLrawDB
+
+from app.tasks.ML.MLTrainTask import MLTrainTask
+from airflow.datasets import Dataset
 
 
 # Définition du DAG
-DAG_ID = "ML_training_raw"
+DAG_ID = "ML_training_raw_flights"
 LIBELLE = "Entraînement de modèles ML sur les données brutes de vol"
 DESCRIPTION = "Entraînement de modèles ML sur les données brutes de vol depuis la table 'raw_flights' dans la base de données flight_dw."
 
+# Dataset de la table en entrée
 raw_flights_table = Dataset("postgres://postgres_api/flight_dw/analytics/raw_flights")
+# Dataset de sortie pour le modèle entraîné 
+ml_model_dataset = Dataset("file:///mlflow/models/latest")
 
 
 default_args = {
@@ -47,11 +50,11 @@ with DAG(
     dagrun_timeout=timedelta(minutes=10),
     description=DESCRIPTION,
     doc_md="""
-            Entraînement de modèles ML sur les données brutes de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis la table 'raw_flights' dans la base de données flight_dw.
+            Entraînement de modèles ML sur les données brutes de vol de la veille (raw) depuis la table 'raw_flights' dans la base de données flight_dw.
         """
 ) as dag:
     
-    # Features
+    # Features 
     features = [
         "origin_airport", "destination_airport", "departure_time_block",
         "day_of_week", "month", "dep_hour", "arr_hour", "is_cancelled"
@@ -59,6 +62,7 @@ with DAG(
     categorical_features = ["origin_airport", "destination_airport", "departure_time_block"]
     numeric_features = ["day_of_week", "month", "dep_hour", "arr_hour"]
 
+    # Preprocessor pour les modèles ML
     preprocessor = ColumnTransformer([
         ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features),
         ("num", StandardScaler(), numeric_features)
@@ -133,19 +137,24 @@ with DAG(
             task_id="task_extract_db",
         )
 
+
     task_technical_informations = TechnicalInfo(
         input_file="task_extract_db",
         output_file="task_technical_informations",
         task_id="task_technical_informations",
     )
 
-    task_training_models_ml = MLrawDB(
+
+    task_training_models_ml = MLTrainTask(
+        experiment_name="Flight_Delay_Prediction",
+        model_registry_name="flight_delay_model",
         input_file="task_technical_informations",
         features=features,
         target="is_delayed",
         models=models_dict,
         task_id="task_training_models_ml",
-        )
+        outlets=[ml_model_dataset],
+    )
 
     # Définition de l'ordre d'exécution
     task_extract_db >> task_technical_informations >> task_training_models_ml
