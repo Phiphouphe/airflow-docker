@@ -1,1 +1,0 @@
-['origin_airport', 'destination_airport', 'departure_time_block', 'day_of_week', 'month', 'dep_hour', 'arr_hour', 'is_cancelled']

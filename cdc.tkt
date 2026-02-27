@@ -107,8 +107,6 @@ departure_time_block → "morning", "afternoon", "evening", "night" selon heure 
 
 
 Next step : ML
-- ML Flow Tracking à Vérifier
-- ML Models
-- ML Registry
+- API
 - Blue Green Deployment
 

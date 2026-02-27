@@ -146,6 +146,8 @@ with DAG(
 
 
     task_training_models_ml = MLTrainTask(
+        experiment_name="Flight_Delay_Prediction",
+        model_registry_name="flight_delay_model",
         input_file="task_technical_informations",
         features=features,
         target="is_delayed",

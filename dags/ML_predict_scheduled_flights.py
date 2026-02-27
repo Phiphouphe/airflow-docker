@@ -108,6 +108,8 @@ with DAG(
 
     task_predict_ml = MLPredictTask(
         input_file="task_technical_informations",
+        experiment_name="Flight_Delay_Prediction",
+        model_registry_name="flight_delay_model",
         features=[
             "origin_airport",
             "destination_airport",
