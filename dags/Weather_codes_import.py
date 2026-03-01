@@ -12,9 +12,9 @@ from app.tasks.Load.Load_to_database import Load_to_database
 
 
 # Définition du DAG
-DAG_ID = "iata_reference_import"
-LIBELLE = "Import des codes IATA"
-DESCRIPTION = "Import des codes IATA vers la base de données flight_dw."
+DAG_ID = "Weather_codes_import"
+LIBELLE = "Import des codes météo"
+DESCRIPTION = "Import des codes météo vers la base de données flight_dw."
 
 
 default_args = {
@@ -28,27 +28,27 @@ with DAG(
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
     schedule=None,
-    tags=["CODES", "IATA",],
+    tags=["CODES", "WEATHER",],
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(minutes=15),
     description=DESCRIPTION,
     doc_md="""
-            Import des données des codes IATA vers la base de données flight_dw.
+            Import des données des codes météo vers la base de données flight_dw.
             DAG manuel pour injection unique du référentiel.
         """
 ) as dag:
     
-    # Lecture du CSV IATA et conversion en parquet temporaire
+    # Lecture du CSV météo et conversion en parquet temporaire
     task_read_csv_file = CsvReader(
-        csv_file_path="/opt/airflow/data/Codes_IATA.csv",
+        csv_file_path="/opt/airflow/data/Weather_codes.csv",
         output_file="task_read_csv_file",
         task_id="task_read_csv_file",
     )
 
     # Chargement dans la table de référentiel
     task_load_data_to_db = Load_to_database(
-        table_name="iata_delay_codes",
+        table_name="weather_codes",
         schema_name="ref",
         input_parquet_file="task_read_csv_file",
         database_conn_id="flight_dw_postgres",
