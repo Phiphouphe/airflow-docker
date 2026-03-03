@@ -81,6 +81,7 @@ with DAG(
                      "wind_gusts_max",
                      "wind_direction",
                      "weather_code",
+                     "weather_description",
                      "code_iata",
                      "title_iata",
                      "description_iata",
