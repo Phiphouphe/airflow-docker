@@ -123,6 +123,17 @@ with DAG(
             output_parquet_file="task_extract_db_iata_codes",
         )
 
+        # Extraction des données référentielles des codes Météo depuis la base de données
+        task_extract_db_weather_codes = DB_extraction(
+            table_name="weather_codes",
+            schema_name="ref",
+            query="""SELECT code, description 
+                    FROM ref.weather_codes""",
+            task_id="task_extract_db_weather_codes",
+            database_conn_id="flight_dw_postgres",
+            output_parquet_file="task_extract_db_weather_codes",
+        )
+
         # Extraction des données météo de la veille depuis la base de données
         task_extract_db_raw_weather = DB_extraction(
             table_name="raw_weather",
@@ -186,9 +197,22 @@ with DAG(
             task_id="task_join_raw_flights_weather"
         )
 
+        # Jointure des données de vol de la veille (raw) avec les données de codes météo
+        task_join_raw_flights_weather_codes = ParquetJoin(
+            left_file="task_join_raw_flights_weather",
+            right_file="task_extract_db_weather_codes",
+            on={
+                "weather_code":"code",
+            },
+            how="left",
+            rename_right={"description": "weather_description"},
+            output_file="task_join_raw_flights_weather_codes",
+            task_id="task_join_raw_flights_weather_codes"
+        )
+
         # Jointure des données de vol de la veille (raw) avec les données IATA correspondantes
         task_join_raw_flights_iata = ParquetJoin(
-            left_file="task_join_raw_flights_weather",
+            left_file="task_join_raw_flights_weather_codes",
             right_file="task_extract_db_iata_codes",
             on={
                 "delay_code": "id",
@@ -199,10 +223,10 @@ with DAG(
             task_id="task_join_raw_flights_iata"
         )
 
-        task_join_raw_flights_weather >> task_join_raw_flights_iata
+        task_join_raw_flights_weather >> task_join_raw_flights_weather_codes >> task_join_raw_flights_iata
 
     with TaskGroup('join_tables_scheduled') as join_tables_scheduled:
-        # Jointure des données de vol du jour même (scheduled) avec les données IATA correspondantes
+        # Jointure des données de vol du jour même (scheduled) avec les données météo correspondantes
         task_join_scheduled_flights_weather = ParquetJoin(
             left_file="task_extract_array_scheduled_flights",
             right_file="task_extract_db_scheduled_weather",
@@ -215,9 +239,22 @@ with DAG(
             task_id="task_join_scheduled_flights_weather"
         )
 
+        # Jointure des données de vol du jour même (scheduled) avec les données de codes météo
+        task_join_scheduled_flights_weather_codes = ParquetJoin(
+            left_file="task_join_scheduled_flights_weather",
+            right_file="task_extract_db_weather_codes",
+            on={
+                "weather_code":"code",
+            },
+            how="left",
+            rename_right={"description": "weather_description"},
+            output_file="task_join_scheduled_flights_weather_codes",
+            task_id="task_join_scheduled_flights_weather_codes"
+        )
+
         # Jointure des données de vol du jour même (scheduled) avec les données IATA correspondantes
         task_join_scheduled_flights_iata = ParquetJoin(
-            left_file="task_join_scheduled_flights_weather",
+            left_file="task_join_scheduled_flights_weather_codes",
             right_file="task_extract_db_iata_codes",
             on={
                 "delay_code": "id",
@@ -228,14 +265,14 @@ with DAG(
             task_id="task_join_scheduled_flights_iata"
         )
 
-        task_join_raw_flights_weather >> task_join_raw_flights_iata
+        task_join_scheduled_flights_weather >> task_join_scheduled_flights_weather_codes >> task_join_scheduled_flights_iata
 
     with TaskGroup('remove_columns') as remove_columns:
         # Suppression des colonnes intermédiaires après jointure pour le fichier raw (vols de la veille)
         task_remove_columns_raw_flights = ColumnRemover(
             input_file="task_join_raw_flights_iata",
             output_file="task_remove_columns_raw_flights",
-            columns_to_drop=["delay_minutes", "id", "airport_iata"],
+            columns_to_drop=["delay_minutes", "id", "airport_iata", "code"],
             task_id="task_remove_columns_raw_flights",
         )
 
@@ -243,7 +280,7 @@ with DAG(
         task_remove_columns_scheduled_flights = ColumnRemover(
             input_file="task_join_scheduled_flights_iata",
             output_file="task_remove_columns_scheduled_flights",
-            columns_to_drop=["delay_minutes", "id", "airport_iata"],
+            columns_to_drop=["delay_minutes", "id", "airport_iata", "code"],
             task_id="task_remove_columns_scheduled_flights",
         )
 

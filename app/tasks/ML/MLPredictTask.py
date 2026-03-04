@@ -4,6 +4,7 @@ import pandas as pd
 
 import mlflow
 from mlflow.tracking import MlflowClient
+from sqlalchemy import text
 
 import app.helper as helper
 
@@ -11,6 +12,8 @@ from datetime import timedelta
 
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
+from app.static.connector_db import ConnectorDb
+
 
 class MLPredictTask(PythonOperator):
 
@@ -49,10 +52,10 @@ class MLPredictTask(PythonOperator):
         )
 
     def _run(self, **context):
-        
+
         try:
             mlflow.set_tracking_uri("http://mlflow:5000")
-            client = MlflowClient()  # ← ajouté
+            client = MlflowClient()
             logging.info(f"Using tracking URI: http://mlflow:5000")
 
             # Créer ou sélectionner l'expérience MLflow
@@ -98,7 +101,6 @@ class MLPredictTask(PythonOperator):
             pct_delayed = round((value_counts.get(1, 0) / num_predictions) * 100, 2)
             pct_not_delayed = round((value_counts.get(0, 0) / num_predictions) * 100, 2)
 
-            # Log dans Airflow
             logging.info(f"\n{'='*50}")
             logging.info(f"📊 Résultats des prédictions :")
             logging.info(f"   - Nombre de prédictions  : {num_predictions}")
@@ -107,29 +109,27 @@ class MLPredictTask(PythonOperator):
             logging.info(f"   - Temps d'inférence      : {inference_time}s")
             logging.info(f"{'='*50}")
 
+            # Récupérer la version du modèle en Production
+            production_versions = client.get_latest_versions(self._model_registry_name, stages=["Production"])
+            model_version = production_versions[0].version if production_versions else None
+
             # Log dans MLflow
             run_name = f"{model_name}_prediction_run"
             artifact_path = f"{model_name.lower()}_predictions"
             with mlflow.start_run(run_name=run_name) as run:
-                # Params
                 mlflow.log_param("model_used", model_name)
                 mlflow.log_param("model_uri", model_uri)
                 mlflow.log_param("input_file", self._input_file)
                 mlflow.log_param("features", str(self._features))
-
-                # Métriques
                 mlflow.log_metric("num_predictions", num_predictions)
                 mlflow.log_metric("pct_delayed", pct_delayed)
                 mlflow.log_metric("pct_not_delayed", pct_not_delayed)
                 mlflow.log_metric("inference_time_sec", inference_time)
 
-                # Artefact
-                pred_df = pd.DataFrame({"predictions": predictions})
-                pred_df.to_csv("/tmp/predictions.csv", index=False)
+                pred_df_mlflow = pd.DataFrame({"predictions": predictions})
+                pred_df_mlflow.to_csv("/tmp/predictions.csv", index=False)
                 mlflow.log_artifact("/tmp/predictions.csv", artifact_path)
 
-                # Tagger la version du modèle en Production avec les stats du dernier run
-                production_versions = client.get_latest_versions(self._model_registry_name, stages=["Production"])
                 if production_versions:
                     prod_version = production_versions[0].version
                     client.set_model_version_tag(self._model_registry_name, prod_version, "last_prediction_run_id", run.info.run_id)
@@ -137,6 +137,86 @@ class MLPredictTask(PythonOperator):
                     client.set_model_version_tag(self._model_registry_name, prod_version, "last_pct_delayed", str(pct_delayed))
                     client.set_model_version_tag(self._model_registry_name, prod_version, "last_inference_time_sec", str(inference_time))
                     logging.info(f"✅ Tags mis à jour sur la version {prod_version} du modèle en Production")
+
+                run_id = run.info.run_id
+
+            # Écriture des prédictions en base de données
+            try:
+                engine = ConnectorDb.get_db_engine("flight_dw_postgres")
+
+                pred_db = df[["date", "dep_hour", "origin_airport", "destination_airport",
+                              "departure_time_block", "day_of_week", "month", "is_cancelled"]].copy()
+                pred_db["is_delayed"] = predictions
+                pred_db["prediction_date"] = pd.Timestamp.now()
+                pred_db["run_id"] = run_id
+                pred_db["model_name"] = model_name
+                pred_db["model_version"] = model_version
+                pred_db = pred_db.rename(columns={"date": "flight_date"})
+
+                with engine.begin() as conn:
+                    # Créer le schéma ml si nécessaire
+                    conn.execute(text("CREATE SCHEMA IF NOT EXISTS ml"))
+
+                    # Créer la table si elle n'existe pas
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS ml.flight_predictions (
+                            id                   SERIAL PRIMARY KEY,
+                            flight_date          DATE,
+                            dep_hour             INTEGER,
+                            origin_airport       VARCHAR,
+                            destination_airport  VARCHAR,
+                            departure_time_block VARCHAR,
+                            day_of_week          INTEGER,
+                            month                INTEGER,
+                            is_cancelled         BOOLEAN,
+                            is_delayed           BOOLEAN,
+                            prediction_date      TIMESTAMP DEFAULT NOW(),
+                            run_id               VARCHAR,
+                            model_name           VARCHAR,
+                            model_version        VARCHAR,
+                            CONSTRAINT uq_flight_prediction 
+                                UNIQUE (flight_date, dep_hour, origin_airport, destination_airport)
+                        )
+                    """))
+
+                    # Upsert ligne par ligne
+                    for _, row in pred_db.iterrows():
+                        conn.execute(text("""
+                            INSERT INTO ml.flight_predictions 
+                                (flight_date, dep_hour, origin_airport, destination_airport,
+                                 departure_time_block, day_of_week, month, is_cancelled,
+                                 is_delayed, prediction_date, run_id, model_name, model_version)
+                            VALUES 
+                                (:flight_date, :dep_hour, :origin_airport, :destination_airport,
+                                 :departure_time_block, :day_of_week, :month, :is_cancelled,
+                                 :is_delayed, :prediction_date, :run_id, :model_name, :model_version)
+                            ON CONFLICT (flight_date, dep_hour, origin_airport, destination_airport)
+                            DO UPDATE SET
+                                is_delayed = EXCLUDED.is_delayed,
+                                prediction_date = EXCLUDED.prediction_date,
+                                run_id = EXCLUDED.run_id,
+                                model_name = EXCLUDED.model_name,
+                                model_version = EXCLUDED.model_version
+                        """), {
+                            "flight_date": row["flight_date"],
+                            "dep_hour": int(row["dep_hour"]),
+                            "origin_airport": row["origin_airport"],
+                            "destination_airport": row["destination_airport"],
+                            "departure_time_block": row["departure_time_block"],
+                            "day_of_week": int(row["day_of_week"]),
+                            "month": int(row["month"]),
+                            "is_cancelled": bool(row["is_cancelled"]),
+                            "is_delayed": bool(row["is_delayed"]),
+                            "prediction_date": row["prediction_date"],
+                            "run_id": row["run_id"],
+                            "model_name": row["model_name"],
+                            "model_version": str(row["model_version"]),
+                        })
+
+                logging.info(f"✅ {len(pred_db)} prédictions écrites en base (ml.flight_predictions)")
+
+            except Exception as e:
+                logging.warning(f"⚠️ Impossible d'écrire les prédictions en base : {e}")
 
             return {
                 "model_name": model_name,

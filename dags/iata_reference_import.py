@@ -41,7 +41,7 @@ with DAG(
     
     # Lecture du CSV IATA et conversion en parquet temporaire
     task_read_csv_file = CsvReader(
-        csv_file_path="/opt/airflow/data/Codes_IATA.csv",
+        csv_file_path="/opt/airflow/data/codes_IATA.csv",
         output_file="task_read_csv_file",
         task_id="task_read_csv_file",
     )
