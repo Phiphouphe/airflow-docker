@@ -137,7 +137,6 @@ jobs:
     name: DAG Integrity Tests
     runs-on: ubuntu-latest
     needs: lint
-    continue-on-error: true 
 
     env:
       AIRFLOW_HOME: /tmp/airflow
