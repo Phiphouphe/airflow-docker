@@ -1,0 +1,10 @@
+{
+  "remote.SSH.defaultForwardedPorts": [
+    { "localPort": 8080, "remotePort": 8080, "name": "Airflow" },
+    { "localPort": 8000, "remotePort": 8000, "name": "Flight API" },
+    { "localPort": 8501, "remotePort": 8501, "name": "Streamlit" },
+    { "localPort": 5000, "remotePort": 5000, "name": "MLflow" },
+    { "localPort": 5050, "remotePort": 5050, "name": "pgAdmin" },
+    { "localPort": 15432, "remotePort": 15432, "name": "Postgres API" }
+  ]
+}

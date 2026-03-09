@@ -9,6 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.CSV_reader import CsvReader
 from app.tasks.Load.Load_to_database import Load_to_database
+from app.datasets import ref_weather_codes_table
 
 
 # Définition du DAG
@@ -54,6 +55,7 @@ with DAG(
         database_conn_id="flight_dw_postgres",
         if_exists="replace",
         task_id="task_load_data_to_db",
+        outlets=[ref_weather_codes_table],
     )
 
     # Définition des dépendances entre les tâches
