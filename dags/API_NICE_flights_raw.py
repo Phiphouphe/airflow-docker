@@ -23,7 +23,7 @@ from app.datasets import raw_flights_nice_done, raw_scheduled_flights_nice_done
 
 
 # Importation de la clé API depuis les Variables Airflow
-API_KEY = Variable.get("AIRFRANCE_API_KEY")
+API_KEY = Variable.get("AIRFRANCE_API_KEY", default_var=None)
 
 # Définition du DAG
 DAG_ID = "API_NICE_flights_raw"

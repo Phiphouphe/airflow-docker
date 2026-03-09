@@ -83,10 +83,8 @@ class TestDagIntegrity:
 
     def test_no_cycles_in_tasks(self, dagbag):
         """Aucun cycle dans les dépendances de tâches."""
-        if not dagbag.dags:
-            pytest.skip("DAGs non chargés en CI")
         for dag_id, dag in dagbag.dags.items():
-            dag.test_cycle()
+            dag.topological_sort()  # lève une exception si cycle détecté
 
 
 # ── Tests schedules ───────────────────────────────────────────────────────────
