@@ -83,7 +83,8 @@ jobs:
             apache-airflow==2.9.0 \
             pandas numpy \
             fastapi httpx \
-            python-jose[cryptography] passlib[bcrypt] \
+            "python-jose[cryptography]" "passlib[bcrypt]" \
+            "bcrypt==4.0.1" \
             python-multipart python-dotenv \
             sqlalchemy psycopg2-binary
 
@@ -157,12 +158,17 @@ jobs:
             pytest \
             apache-airflow==2.9.0 \
             pandas numpy sqlalchemy psycopg2-binary \
+            scikit-learn mlflow \
             apache-airflow-providers-postgres \
             apache-airflow-providers-standard
 
       - name: Initialize Airflow DB
         run: |
           airflow db migrate
+          
+      - name: Add app to Python path
+        run: |
+          echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
 
       - name: Run DAG integrity tests
         run: |
