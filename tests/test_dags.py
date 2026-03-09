@@ -53,13 +53,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 @pytest.fixture(scope="module")
 def dagbag():
     import sys
-    workspace = os.path.join(os.path.dirname(__file__), '..')
-    workspace = os.path.abspath(workspace)
-    if workspace not in sys.path:
-        sys.path.insert(0, workspace)
-    os.environ["PYTHONPATH"] = workspace
+    import os
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    # Patch sys.path dans l'environnement DagBag
+    os.environ["PYTHONPATH"] = root + ":" + os.environ.get("PYTHONPATH", "")
     from airflow.models import DagBag
-    return DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
+    return DagBag(dag_folder=DAGS_FOLDER, include_examples=False, safe_mode=False)
 
 
 # ── Tests intégrité ───────────────────────────────────────────────────────────
