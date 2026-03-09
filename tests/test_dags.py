@@ -92,20 +92,20 @@ class TestDagIntegrity:
 class TestDagSchedules:
 
     def test_flights_raw_dags_schedule(self, dagbag):
-        """Les DAGs raw flights tournent toutes les 2h à partir de 5h20."""
+        """Les DAGs raw flights tournent toutes les 2h avec décalage de 5min entre eux."""
         if not dagbag.dags:
             pytest.skip("DAGs non chargés en CI")
-        flight_dags = [
-            "API_NICE_flights_raw",
-            "API_TOULOUSE_flights_raw",
-            "API_LYON_flights_raw",
-            "API_MARSEILLE_flights_raw",
-            "API_BORDEAUX_flights_raw",
-        ]
-        for dag_id in flight_dags:
+        expected_schedules = {
+            "API_NICE_flights_raw":      "0 5,7,9,11,13,15,17,19 * * *",
+            "API_LYON_flights_raw":      "5 5,7,9,11,13,15,17,19 * * *",
+            "API_MARSEILLE_flights_raw": "10 5,7,9,11,13,15,17,19 * * *",
+            "API_BORDEAUX_flights_raw":  "15 5,7,9,11,13,15,17,19 * * *",
+            "API_TOULOUSE_flights_raw":  "20 5,7,9,11,13,15,17,19 * * *",
+        }
+        for dag_id, expected_cron in expected_schedules.items():
             dag = dagbag.dags[dag_id]
-            assert str(dag.schedule_interval) == EXPECTED_CRON, \
-                f"DAG {dag_id} : schedule={dag.schedule_interval}, attendu {EXPECTED_CRON}"
+            assert str(dag.schedule_interval) == expected_cron, \
+                f"DAG {dag_id} : schedule={dag.schedule_interval}, attendu {expected_cron}"
 
     def test_weather_dag_schedule(self, dagbag):
         """Le DAG météo tourne une fois par jour à 5h."""
