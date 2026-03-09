@@ -229,7 +229,7 @@ class TestMLflowIntegration:
     def test_model_loaded_from_registry(self):
         """Le modèle entraîné est bien chargé depuis le MLflow Registry en Production.
         Les prédictions résultantes sont stockées dans ml.flight_predictions (PostgreSQL)."""
-        with patch("mlflow.sklearn.load_model") as mock_load:
+        with patch("mlflow.pyfunc.load_model") as mock_load:
             mock_model = MagicMock()
             mock_load.return_value = mock_model
 
@@ -243,7 +243,7 @@ class TestMLflowIntegration:
 
     def test_predictions_are_boolean(self, sample_features_df):
         """Les prédictions retournées sont bien des booléens."""
-        with patch("mlflow.sklearn.load_model") as mock_load:
+        with patch("mlflow.pyfunc.load_model") as mock_load:
             mock_model = MagicMock()
             mock_model.predict.return_value = np.array([False, False, True])
             mock_load.return_value = mock_model
@@ -257,7 +257,7 @@ class TestMLflowIntegration:
 
     def test_prediction_count_matches_input(self, sample_features_df):
         """Le nombre de prédictions correspond au nombre de vols en entrée."""
-        with patch("mlflow.sklearn.load_model") as mock_load:
+        with patch("mlflow.pyfunc.load_model") as mock_load:
             mock_model = MagicMock()
             mock_model.predict.return_value = np.array([False] * len(sample_features_df))
             mock_load.return_value = mock_model
@@ -270,7 +270,7 @@ class TestMLflowIntegration:
 
     def test_production_model_version_retrieved(self):
         """La version du modèle en Production est bien récupérée."""
-        with patch("mlflow.tracking.MlflowClient") as MockClient:
+        with patch("mlflow.MlflowClient") as MockClient:
             mock_client = MockClient.return_value
             mock_version = MagicMock()
             mock_version.version = "16"
