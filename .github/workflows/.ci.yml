@@ -163,10 +163,8 @@ jobs:
             scikit-learn xgboost mlflow \
             apache-airflow-providers-postgres \
             apache-airflow-providers-standard
-          SITE_PKG=$(python -c "import site; print(site.getsitepackages()[0])")
-          echo "${{ github.workspace }}" > "$SITE_PKG/airflow_project.pth"
-          echo "Fichier .pth créé dans $SITE_PKG"
-          cat "$SITE_PKG/airflow_project.pth"
+          # Installer app/ comme package pip editable
+          pip install -e .
 
       - name: Initialize Airflow DB
         run: |
