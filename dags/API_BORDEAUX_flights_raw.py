@@ -23,7 +23,7 @@ from app.datasets import raw_flights_bordeaux_done, raw_scheduled_flights_bordea
 
 
 # Importation de la clé API depuis les Variables Airflow
-API_KEY = Variable.get("AIRFRANCE_API_KEY")
+API_KEY = Variable.get("AIRFRANCE_API_KEY", default_var=None)
 
 # Définition du DAG
 DAG_ID = "API_BORDEAUX_flights_raw"
