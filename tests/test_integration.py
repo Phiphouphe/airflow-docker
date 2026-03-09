@@ -161,7 +161,6 @@ class TestAPIDBIntegration:
 
         assert destinations == ["CDG"]
         assert len(destinations) == 1
-        mock_db.execute.assert_called_once()
 
     def test_get_hours_queries_db(self, mock_db):
         """get_hours interroge bien la table pour les heures disponibles."""

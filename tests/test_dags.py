@@ -45,11 +45,16 @@ EXPECTED_CRON = "20 5,7,9,11,13,15,17,19 * * *"
 WEATHER_CRON = "0 5 * * *"
 ML_TRAINING_CRON = "40 5 * * *"
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 
 # ── Fixture DagBag ─────────────────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
 def dagbag():
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+    os.environ["PYTHONPATH"] = os.path.join(os.path.dirname(__file__), '..')
     from airflow.models import DagBag
     return DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
 
