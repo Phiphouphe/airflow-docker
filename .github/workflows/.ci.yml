@@ -163,6 +163,8 @@ jobs:
             scikit-learn xgboost mlflow \
             apache-airflow-providers-postgres \
             apache-airflow-providers-standard
+          # Forcer app/ dans le path Python via un fichier .pth
+          python -c "import site; open(site.getsitepackages()[0]+'/airflow_project.pth','w').write('${{ github.workspace }}\n')"
 
       - name: Initialize Airflow DB
         run: |
