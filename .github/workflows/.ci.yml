@@ -152,13 +152,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Airflow & dependencies  # ← remplace ce step
+      - name: Add app to Python path
+        run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
+      - name: Install Airflow & dependencies
         run: |
           pip install \
             pytest \
             apache-airflow==2.9.0 \
             pandas numpy sqlalchemy psycopg2-binary \
-            scikit-learn mlflow \
+            scikit-learn xgboost mlflow \
             apache-airflow-providers-postgres \
             apache-airflow-providers-standard
 
