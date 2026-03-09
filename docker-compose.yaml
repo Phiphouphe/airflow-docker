@@ -388,7 +388,7 @@ services:
   # ---------------- MLFlow ----------------
   mlflow:
     build:
-      context: ./mlflow
+      context: ./mlflow_folder
       dockerfile: dockerfile
     container_name: mlflow
     ports:
