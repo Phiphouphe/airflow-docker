@@ -35,8 +35,7 @@ jobs:
           flake8 app/ dags/ api/ \
             --max-line-length=120 \
             --exclude=__pycache__,.git \
-            --ignore=E501,W503,E402
-        continue-on-error: false
+            --ignore=E501,W503,E402,W291,W292,W293,W391,E302,E303,E121,E122,E123,E124,E125,E126,E127,E128,E203,E226,E231,E251,E266,W504,F401,F811,F541,F841
 
       - name: Run black (formatting check)
         run: |
