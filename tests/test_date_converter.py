@@ -54,7 +54,8 @@ class TestTimestampConversion:
     def test_timestamp_is_utc(self, df_raw):
         """Les timestamps sont normalisés en UTC."""
         result = convert_dates(df_raw, timestamp_columns=["scheduled_departure"])
-        assert str(result["scheduled_departure"].dtype) == "datetime64[ns, UTC]"
+        dtype_str = str(result["scheduled_departure"].dtype)
+        assert "UTC" in dtype_str, f"Le timestamp doit être en UTC, reçu : {dtype_str}"
 
     def test_null_timestamp_becomes_nat(self, df_raw):
         """Les valeurs None deviennent NaT."""

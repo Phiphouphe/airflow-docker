@@ -151,9 +151,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Airflow & dependencies
+      - name: Install Airflow & dependencies  # ← remplace ce step
         run: |
           pip install \
+            pytest \
             apache-airflow==2.9.0 \
             pandas numpy sqlalchemy psycopg2-binary \
             apache-airflow-providers-postgres \
