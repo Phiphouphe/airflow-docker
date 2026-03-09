@@ -52,9 +52,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 @pytest.fixture(scope="module")
 def dagbag():
-    import sys, os
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-    os.environ["PYTHONPATH"] = os.path.join(os.path.dirname(__file__), '..')
+    import sys
+    workspace = os.path.join(os.path.dirname(__file__), '..')
+    workspace = os.path.abspath(workspace)
+    if workspace not in sys.path:
+        sys.path.insert(0, workspace)
+    os.environ["PYTHONPATH"] = workspace
     from airflow.models import DagBag
     return DagBag(dag_folder=DAGS_FOLDER, include_examples=False)
 
