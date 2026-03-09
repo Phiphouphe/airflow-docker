@@ -57,7 +57,17 @@ class TechnicalInfo(PythonOperator):
 
         # Récupérer le contexte de l'exécution
         instance_id = context["run_id"]
-        logical_date = context["logical_date"]
+        dag_run = context.get("dag_run")
+        logging.info(f"🔍 dag_run.logical_date : {dag_run.logical_date if dag_run else None}")
+        logging.info(f"🔍 logical_date : {context.get('logical_date')}")
+        logging.info(f"🔍 data_interval_start : {context.get('data_interval_start')}")
+        logical_date = (
+            context.get("logical_date") 
+            or context.get("data_interval_start")
+            or (dag_run.logical_date if dag_run else None)
+            or pendulum.now("UTC")
+        )
+        logging.info(f"🔍 logical_date final utilisé : {logical_date}")
 
         # Convertir logical_date en pendulum
         execution_date = pendulum.instance(logical_date)

@@ -15,21 +15,15 @@ from sklearn.pipeline import Pipeline
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.DB_extraction import DB_extraction
-from app.tasks.Transform.TechnicalInfo import TechnicalInfo
-
 from app.tasks.ML.MLTrainTask import MLTrainTask
 from airflow.datasets import Dataset
+from app.datasets import ana_flights_table, ml_model_dataset
 
 
 # Définition du DAG
 DAG_ID = "ML_training_raw_flights"
 LIBELLE = "Entraînement de modèles ML sur les données brutes de vol"
 DESCRIPTION = "Entraînement de modèles ML sur les données brutes de vol depuis la table 'raw_flights' dans la base de données flight_dw."
-
-# Dataset de la table en entrée
-raw_flights_table = Dataset("postgres://postgres_api/flight_dw/analytics/raw_flights")
-# Dataset de sortie pour le modèle entraîné 
-ml_model_dataset = Dataset("file:///mlflow/models/latest")
 
 
 default_args = {
@@ -43,7 +37,8 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule=[raw_flights_table,],
+    schedule="40 5 * * *",
+    # schedule=[ana_flights_table],
     tags=["FLIGHTS","ML", "TRAINING", "RAW"],
     catchup=False,
     max_active_runs=1,
@@ -139,17 +134,10 @@ with DAG(
         )
 
 
-    task_technical_informations = TechnicalInfo(
-        input_file="task_extract_db",
-        output_file="task_technical_informations",
-        task_id="task_technical_informations",
-    )
-
-
     task_training_models_ml = MLTrainTask(
         experiment_name="Flight_Delay_Prediction",
         model_registry_name="flight_delay_model",
-        input_file="task_technical_informations",
+        input_file="task_extract_db",
         features=features,
         target="is_delayed",
         models=models_dict,
@@ -158,4 +146,4 @@ with DAG(
     )
 
     # Définition de l'ordre d'exécution
-    task_extract_db >> task_technical_informations >> task_training_models_ml
+    task_extract_db >> task_training_models_ml

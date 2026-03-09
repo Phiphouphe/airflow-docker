@@ -7,6 +7,7 @@ from datetime import timedelta
 from sqlalchemy import text, inspect
 
 from airflow.operators.python import PythonOperator
+from airflow.models import Variable
 from app.static.connector_db import ConnectorDb
 
 
@@ -19,7 +20,7 @@ class Parquet_to_snapshot2(PythonOperator):
         database_conn_id: str = "flight_dw_postgres",
         chunksize: int = 1000,
         mode: str = "raw",  # "raw" ou "scheduled"
-        api_type: str = "airfrance", # "openmeteo" ou "airfrance"
+        api_type: str = "airfrance",  # "openmeteo" ou "airfrance"
         task_id: str = "Parquet_to_snapshot2",
         **kwargs
     ):
@@ -49,7 +50,7 @@ class Parquet_to_snapshot2(PythonOperator):
             task_id=task_id,
             python_callable=self._run,
             execution_timeout=timedelta(minutes=10),
-            **kwargs
+            **kwargs,
         )
 
     def _run(self, **context):
@@ -64,9 +65,6 @@ class Parquet_to_snapshot2(PythonOperator):
 
         # Créer l'engine PostgreSQL
         engine = ConnectorDb.get_db_engine(self._db_conn_id)
-
-        # Générer le Dataset Airflow pour les outlets
-        dataset = helper.get_postgres_dataset(self._db_conn_id, self._table_name, self._schema)
 
         # Vérifier colonne DATE_PHOTO
         if 'date_photo' not in df.columns:
@@ -107,22 +105,25 @@ class Parquet_to_snapshot2(PythonOperator):
                                 logging.error(f"❌ Erreur suppression Open-Meteo pour {airport_iata}: {e}")
 
                     else:  # airfrance
-                        try:
-                            if self._mode == "scheduled":
-                                logging.info(f"🗑️ Air France scheduled : suppression anciennes données date <= {date_photo}")
-                                delete_query = text(f"""
-                                    DELETE FROM "{self._schema}"."{self._table_name}"
-                                    WHERE "date_photo" <= :date_photo
-                                """)
-                            else:
-                                logging.info(f"ℹ️ Air France raw : suppression ancienne date = {date_photo}")
-                                delete_query = text(f"""
-                                    DELETE FROM "{self._schema}"."{self._table_name}"
-                                    WHERE "date_photo" = :date_photo
-                                """)
-                            conn.execute(delete_query, {"date_photo": date_photo})
-                        except Exception as e:
-                            logging.error(f"❌ Erreur suppression Air France: {e}")
+                        for origin_airport in df['origin_airport'].unique():
+                            try:
+                                if self._mode == "scheduled":
+                                    logging.info(f"🗑️ Air France scheduled : suppression anciennes données date <= {date_photo} pour {origin_airport}")
+                                    delete_query = text(f"""
+                                        DELETE FROM "{self._schema}"."{self._table_name}"
+                                        WHERE "date_photo" <= :date_photo
+                                        AND "origin_airport" = :origin_airport
+                                    """)
+                                else:
+                                    logging.info(f"ℹ️ Air France raw : suppression ancienne date = {date_photo} pour {origin_airport}")
+                                    delete_query = text(f"""
+                                        DELETE FROM "{self._schema}"."{self._table_name}"
+                                        WHERE "date_photo" = :date_photo
+                                        AND "origin_airport" = :origin_airport
+                                    """)
+                                conn.execute(delete_query, {"date_photo": date_photo, "origin_airport": origin_airport})
+                            except Exception as e:
+                                logging.error(f"❌ Erreur suppression Air France pour {origin_airport}: {e}")
                 else:
                     logging.warning(f"⚠️ La table {self._schema}.{self._table_name} n'existe pas. Pas de suppression.")
 
@@ -147,6 +148,15 @@ class Parquet_to_snapshot2(PythonOperator):
 
             except Exception as e:
                 logging.error(f"❌ Erreur globale dans Parquet_to_snapshot2: {e}")
+                raise
+
+        # Sauvegarder date_photo dans une Variable Airflow pour les DAGs déclenchés par asset
+        # Permet aux DAGs suivants de filtrer les données par date_photo sans dépendre du contexte Airflow
+        try:
+            Variable.set(f"date_photo_{self._table_name}", str(date_photo))
+            logging.info(f"📤 Variable Airflow mise à jour : date_photo_{self._table_name} = {date_photo}")
+        except Exception as e:
+            logging.warning(f"⚠️ Impossible de mettre à jour la Variable Airflow : {e}")
 
         # Temps total
         total_time = time.time() - self._start_time

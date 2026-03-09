@@ -19,6 +19,8 @@ from app.tasks.Transform.TechnicalInfo import TechnicalInfo
 from app.tasks.Load.Parquet_to_snapshot import Parquet_to_snapshot
 from app.tasks.Load.Parquet_to_snapshot2 import Parquet_to_snapshot2
 from app.static.extract_flights import extract_flights
+from app.datasets import raw_flights_nice_done, raw_scheduled_flights_nice_done
+
 
 # Importation de la clé API depuis les Variables Airflow
 API_KEY = Variable.get("AIRFRANCE_API_KEY")
@@ -32,16 +34,16 @@ DESCRIPTION = "Import des données de vol en partance de NICE depuis une API ext
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'retries': 2,
-    'retry_delay': timedelta(seconds=5),
+    'retries': 5,
+    'retry_delay': timedelta(minutes=10),
 }
 
 with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule="0 8 * * *",
-    tags=["API", "FLIGHTS", "IMPORT", "RAW"],
+    schedule="0 5,7,9,11,13,15,17,19 * * *",
+    tags=["API", "FLIGHTS", "IMPORT", "RAW", "NICE",],
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(minutes=15),
@@ -116,6 +118,7 @@ with DAG(
             api_type="airfrance",
             input_parquet_file="task_add_technical_info_raw",
             database_conn_id="flight_dw_postgres",
+            outlets=[raw_flights_nice_done],
             task_id="task_load_raw_to_db",
         )
 
@@ -127,6 +130,7 @@ with DAG(
             api_type="airfrance",
             input_parquet_file="task_add_technical_info_scheduled",
             database_conn_id="flight_dw_postgres",
+            outlets=[raw_scheduled_flights_nice_done],
             task_id="task_load_scheduled_to_db",
         )
 

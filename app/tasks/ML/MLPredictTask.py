@@ -144,8 +144,8 @@ class MLPredictTask(PythonOperator):
             try:
                 engine = ConnectorDb.get_db_engine("flight_dw_postgres")
 
-                pred_db = df[["date", "dep_hour", "origin_airport", "destination_airport",
-                              "departure_time_block", "day_of_week", "month", "is_cancelled"]].copy()
+                pred_db = df[["flight_number", "date", "dep_hour", "origin_airport", "destination_airport",
+                            "departure_time_block", "day_of_week", "month", "is_cancelled"]].copy()
                 pred_db["is_delayed"] = predictions
                 pred_db["prediction_date"] = pd.Timestamp.now()
                 pred_db["run_id"] = run_id
@@ -161,6 +161,7 @@ class MLPredictTask(PythonOperator):
                     conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS ml.flight_predictions (
                             id                   SERIAL PRIMARY KEY,
+                            flight_number        VARCHAR,
                             flight_date          DATE,
                             dep_hour             INTEGER,
                             origin_airport       VARCHAR,
@@ -175,7 +176,7 @@ class MLPredictTask(PythonOperator):
                             model_name           VARCHAR,
                             model_version        VARCHAR,
                             CONSTRAINT uq_flight_prediction 
-                                UNIQUE (flight_date, dep_hour, origin_airport, destination_airport)
+                                UNIQUE (flight_number, flight_date)
                         )
                     """))
 
@@ -183,21 +184,23 @@ class MLPredictTask(PythonOperator):
                     for _, row in pred_db.iterrows():
                         conn.execute(text("""
                             INSERT INTO ml.flight_predictions 
-                                (flight_date, dep_hour, origin_airport, destination_airport,
-                                 departure_time_block, day_of_week, month, is_cancelled,
-                                 is_delayed, prediction_date, run_id, model_name, model_version)
+                                (flight_number, flight_date, dep_hour, origin_airport, destination_airport,
+                                departure_time_block, day_of_week, month, is_cancelled,
+                                is_delayed, prediction_date, run_id, model_name, model_version)
                             VALUES 
-                                (:flight_date, :dep_hour, :origin_airport, :destination_airport,
-                                 :departure_time_block, :day_of_week, :month, :is_cancelled,
-                                 :is_delayed, :prediction_date, :run_id, :model_name, :model_version)
-                            ON CONFLICT (flight_date, dep_hour, origin_airport, destination_airport)
+                                (:flight_number, :flight_date, :dep_hour, :origin_airport, :destination_airport,
+                                :departure_time_block, :day_of_week, :month, :is_cancelled,
+                                :is_delayed, :prediction_date, :run_id, :model_name, :model_version)
+                            ON CONFLICT (flight_number, flight_date)
                             DO UPDATE SET
+                                flight_number = EXCLUDED.flight_number,
                                 is_delayed = EXCLUDED.is_delayed,
                                 prediction_date = EXCLUDED.prediction_date,
                                 run_id = EXCLUDED.run_id,
                                 model_name = EXCLUDED.model_name,
                                 model_version = EXCLUDED.model_version
-                        """), {
+                            """), {
+                            "flight_number": row["flight_number"],
                             "flight_date": row["flight_date"],
                             "dep_hour": int(row["dep_hour"]),
                             "origin_airport": row["origin_airport"],

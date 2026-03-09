@@ -1,0 +1,137 @@
+name: CD — Deploy to Production
+
+on:
+  # Déclenchement manuel uniquement depuis l'interface GitHub
+  # Dans un vrai environnement multi-VM, ce workflow se déclencherait
+  # automatiquement sur push/merge sur main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environnement cible"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+
+  # ── Job 1 : Vérifications pré-déploiement ───────────────────────────────────
+  pre-deploy-checks:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pandas numpy fastapi httpx \
+            python-jose[cryptography] passlib[bcrypt] \
+            python-multipart python-dotenv sqlalchemy psycopg2-binary
+
+      - name: Run critical tests before deploy
+        run: |
+          pytest tests/test_db_extraction.py tests/test_api.py -v
+        env:
+          API_SECRET_KEY: "test_secret_key_for_ci"
+          API_ADMIN_PASSWORD: "admin"
+          API_USER_PASSWORD: "user"
+          POSTGRES_USER_API: "test"
+          POSTGRES_PASSWORD_API: "test"
+          POSTGRES_HOST_API: "localhost"
+          POSTGRES_PORT_API: "5432"
+          POSTGRES_DB_API: "test"
+
+
+  # ── Job 2 : Déploiement sur VM via SSH ──────────────────────────────────────
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: pre-deploy-checks
+
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: http://${{ secrets.EC2_HOST }}:8501  # Streamlit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Pull latest code on VM
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ~/airflow-docker
+            git fetch origin
+            git checkout main
+            git pull origin main
+            echo "✅ Code mis à jour"
+          EOF
+
+      - name: Rebuild & restart Docker services
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ~/airflow-docker
+            # Rebuild uniquement les images API et Streamlit
+            docker compose build api streamlit
+            # Redémarrer les services mis à jour
+            docker compose up -d api streamlit
+            # Redémarrer les workers Airflow pour prendre en compte les nouveaux DAGs
+            docker compose restart airflow-worker airflow-dag-processor
+            echo "✅ Services redémarrés"
+          EOF
+
+      - name: Health check API
+        run: |
+          sleep 15  # attendre que les containers démarrent
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
+            if [ "$response" = "200" ]; then
+              echo "✅ API health check OK (HTTP $response)"
+            else
+              echo "❌ API health check FAILED (HTTP $response)"
+              exit 1
+            fi
+          EOF
+
+      - name: Health check Streamlit
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8501)
+            if [ "$response" = "200" ]; then
+              echo "✅ Streamlit health check OK (HTTP $response)"
+            else
+              echo "⚠️ Streamlit health check retourné HTTP $response"
+            fi
+          EOF
+
+      - name: Verify Airflow DAGs loaded
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            sleep 10
+            dag_count=$(docker exec airflow-worker airflow dags list 2>/dev/null | grep -c "True\|False" || echo "0")
+            echo "✅ $dag_count DAGs chargés dans Airflow"
+          EOF
+
+      - name: Deployment summary
+        run: |
+          echo "🚀 Déploiement terminé sur ${{ github.event.inputs.environment }}"
+          echo "📍 VM : ${{ secrets.EC2_HOST }}"
+          echo "🌐 Streamlit : http://${{ secrets.EC2_HOST }}:8501"
+          echo "🔌 API : http://${{ secrets.EC2_HOST }}:8000"
+          echo "📊 Airflow : http://${{ secrets.EC2_HOST }}:8080"
+          echo "🔬 MLflow : http://${{ secrets.EC2_HOST }}:5000"

@@ -17,21 +17,17 @@ from app.tasks.Transform.ColumnRemover import ColumnRemover
 from app.tasks.Transform.PostgresArrayExtractor import PostgresArrayExtractor
 from app.tasks.Transform.ParquetJoin import ParquetJoin
 from app.tasks.Transform.FunctionApply import ApplyFunction
-from app.tasks.Transform.TechnicalInfo import TechnicalInfo
 from app.tasks.Transform.VersionSelector import VersionSelector
 from app.tasks.Load.Parquet_to_snapshot2 import Parquet_to_snapshot2
+from app.datasets import ana_flights_table, ana_scheduled_flights_table, stg_flights_table, stg_scheduled_flights_table, \
+                          stg_weather_table, stg_scheduled_weather_table
 
 
 # Définition du DAG
-DAG_ID = "NICE_flights_analytics"
-LIBELLE = "Transformation et enrichissement métier des données de vol en partance de NICE"
-DESCRIPTION = "Transformation et enrichissement métier des données de vol en partance de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw."
+DAG_ID = "All_flights_analytics"
+LIBELLE = "Transformation et enrichissement métier des données de vol"
+DESCRIPTION = "Transformation et enrichissement métier des données de vol depuis les tables 'raw' et 'staging' dans la base de données flight_dw."
 
-raw_flights_table = Dataset("postgres://postgres_api/flight_dw/staging/raw_flights")
-scheduled_flights_table = Dataset("postgres://postgres_api/flight_dw/staging/scheduled_flights")
-raw_weather_table = Dataset("postgres://postgres_api/flight_dw/staging/raw_weather")
-scheduled_weather_table = Dataset("postgres://postgres_api/flight_dw/staging/scheduled_weather")
-iata_delay_codes_table = Dataset("postgres://postgres_api/flight_dw/ref/iata_delay_codes")
 
 default_args = {
     'owner': 'airflow',
@@ -44,72 +40,79 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule=[raw_flights_table, scheduled_flights_table, raw_weather_table, scheduled_weather_table, iata_delay_codes_table],
+    schedule=[stg_flights_table, stg_scheduled_flights_table,
+              stg_weather_table, stg_scheduled_weather_table,],
     tags=["FLIGHTS", "WEATHER", "IATA","ANALYTICS"],
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(minutes=10),
     description=DESCRIPTION,
     doc_md="""
-            Transformation et enrichissement métier des données de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis les tables 'raw' et 'staging' dans la base de données flight_dw.
+            Transformation et enrichissement métier des données de vol du jour (scheduled) et de la veille (raw) depuis les tables 'raw' et 'staging' dans la base de données flight_dw.
         """
 ) as dag:
+
+    TECHNICAL_COLUMNS = [
+    "date_photo", "semaine_photo", "annee_photo",
+    "execution_date", "instance_id", "dag_id"
+    ]
     
     with TaskGroup('extraction_db') as extraction_db:
         # Extraction des données du vol de la veille (raw) depuis la base de données
         task_extract_db_raw_flights = DB_extraction(
-            table_name="raw_flights",
-            schema_name="staging",
-            columns=["flight_id", 
-                     "flight_number", 
-                     "airline_code",
-                     "date",
-                     "scheduled_departure", 
-                     "actual_departure", 
-                     "scheduled_arrival", 
-                     "actual_arrival",
-                     "origin_airport",
-                     "destination_airport",
-                     "status",
-                     "delay_minutes",
-                     "delay_code",
-                     "registration",
-                     "type_code",
-                     "type_name",
-                     "owner_airline",
-                     "wifi_enabled",
-            ],
-            database_conn_id="flight_dw_postgres",
-            output_parquet_file="task_extract_db_raw_flights",
-            task_id="task_extract_db_raw_flights",
+        table_name="raw_flights",
+        schema_name="staging",
+        columns=["flight_id", 
+                "flight_number", 
+                "airline_code", 
+                "date",
+                "scheduled_departure", 
+                "actual_departure",
+                "scheduled_arrival", 
+                "actual_arrival",
+                "origin_airport", 
+                "destination_airport",
+                "status", 
+                "delay_minutes", 
+                "delay_code",
+                "registration", 
+                "type_code", 
+                "type_name",
+                "owner_airline", 
+                "wifi_enabled",
+        ] + TECHNICAL_COLUMNS,
+        airflow_variable_date_photo="date_photo_raw_flights",
+        database_conn_id="flight_dw_postgres",
+        output_parquet_file="task_extract_db_raw_flights",
+        task_id="task_extract_db_raw_flights",
         )
 
         # Extraction des données de vol du jour même (scheduled) depuis la base de données
         task_extract_db_scheduled_flights = DB_extraction(
-            table_name="scheduled_flights",
-            schema_name="staging",
-            columns=["flight_id", 
-                     "flight_number", 
-                     "airline_code",
-                     "date",
-                     "scheduled_departure", 
-                     "actual_departure", 
-                     "scheduled_arrival", 
-                     "actual_arrival",
-                     "origin_airport",
-                     "destination_airport",
-                     "status",
-                     "delay_minutes",
-                     "delay_code",
-                     "registration",
-                     "type_code",
-                     "type_name",
-                     "owner_airline",
-                     "wifi_enabled",
-            ],
-            database_conn_id="flight_dw_postgres",
-            output_parquet_file="task_extract_db_scheduled_flights",
-            task_id="task_extract_db_scheduled_flights",
+        table_name="scheduled_flights",
+        schema_name="staging",
+        columns=["flight_id", 
+                "flight_number", 
+                "airline_code", 
+                "date",
+                "scheduled_departure", 
+                "actual_departure",
+                "scheduled_arrival", 
+                "actual_arrival",
+                "origin_airport", 
+                "destination_airport",
+                "status", 
+                "delay_minutes", 
+                "delay_code",
+                "registration", 
+                "type_code", 
+                "type_name",
+                "owner_airline", "wifi_enabled",
+        ] + TECHNICAL_COLUMNS,
+        airflow_variable_date_photo="date_photo_scheduled_flights",
+        database_conn_id="flight_dw_postgres",
+        output_parquet_file="task_extract_db_scheduled_flights",
+        task_id="task_extract_db_scheduled_flights",
         )
 
         # Extraction des données référentielles des codes IATA depuis la base de données
@@ -424,27 +427,10 @@ with DAG(
 
         [task_apply_functions_raw_flights, task_apply_functions_scheduled_flights]   
 
-    with TaskGroup('technical_informations') as technical_informations:
-        # Ajout des informations techniques pour le fichier raw (vols de la veille)
-        task_add_technical_info_raw_flights = TechnicalInfo(
-            input_file="task_apply_functions_raw_flights",
-            output_file="task_add_technical_info_raw_flights",
-            task_id="task_add_technical_info_raw_flights",
-        )
-
-        # Ajout des informations techniques pour le fichier scheduled (vols du jour même)
-        task_add_technical_info_scheduled_flights = TechnicalInfo(
-            input_file="task_apply_functions_scheduled_flights",
-            output_file="task_add_technical_info_scheduled_flights",
-            task_id="task_add_technical_info_scheduled_flights",
-        )
-
-        [task_add_technical_info_raw_flights, task_add_technical_info_scheduled_flights]
-
     with TaskGroup('version_selector') as version_selector:
         # Sélection de la version finale des données de vol de la veille (raw)
         task_select_final_version_raw_flights = VersionSelector(
-            input_file="task_add_technical_info_raw_flights",
+            input_file="task_apply_functions_raw_flights",
             output_file="task_select_final_version_raw_flights",
             key_columns=["flight_id", 
                          "flight_number",
@@ -458,7 +444,7 @@ with DAG(
 
         # Sélection de la version finale des données de vol du jour même (scheduled)
         task_select_final_version_scheduled_flights = VersionSelector(
-            input_file="task_add_technical_info_scheduled_flights",
+            input_file="task_apply_functions_scheduled_flights",
             output_file="task_select_final_version_scheduled_flights",
             key_columns=["flight_id", 
                          "flight_number",
@@ -481,6 +467,7 @@ with DAG(
             api_type="airfrance",
             input_parquet_file="task_select_final_version_raw_flights",
             database_conn_id="flight_dw_postgres",
+            outlets=[ana_flights_table],
             task_id="task_load_raw_to_db",
         )
 
@@ -492,6 +479,7 @@ with DAG(
             api_type="airfrance",
             input_parquet_file="task_select_final_version_scheduled_flights",
             database_conn_id="flight_dw_postgres",
+            outlets=[ana_scheduled_flights_table],
             task_id="task_load_scheduled_to_db",
         )
 
@@ -501,4 +489,4 @@ with DAG(
     # Définition des dépendances entre les tâches
     # Les données de vol "raw" et "scheduled" suivent des chemins parallèles d'extraction, de transformation et de chargement.
 
-    extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> technical_informations >> version_selector >> loading
+    extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> version_selector >> loading

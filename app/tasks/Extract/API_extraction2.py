@@ -17,7 +17,7 @@ class API_extraction2(PythonOperator):
         transform_function: callable = None,
         flight_mode: str = "raw",
         api_type: str = "airfrance",  # "airfrance" ou "openmeteo"
-        execution_timeout: timedelta = timedelta(seconds=60),
+        execution_timeout: timedelta = timedelta(seconds=240),
         task_id: str = "API_extraction2",
         **kwargs
     ) -> None:

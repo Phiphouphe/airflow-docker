@@ -9,6 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.CSV_reader import CsvReader
 from app.tasks.Load.Load_to_database import Load_to_database
+from app.datasets import ref_iata_delay_codes_table
 
 
 # Définition du DAG
@@ -53,6 +54,7 @@ with DAG(
         input_parquet_file="task_read_csv_file",
         database_conn_id="flight_dw_postgres",
         if_exists="replace",
+        outlets=[ref_iata_delay_codes_table],
         task_id="task_load_data_to_db",
     )
 

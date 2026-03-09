@@ -11,3 +11,8 @@ PGADMIN_PORT=5050
 
 # -------- MLFlow --------
 MLFLOW_PORT=5000
+
+# -------- API --------
+API_SECRET_KEY=  # résultat de : openssl rand -hex 32
+API_ADMIN_PASSWORD=ton_mot_de_passe_admin
+API_USER_PASSWORD=ton_mot_de_passe_user
