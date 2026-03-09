@@ -146,3 +146,4 @@ class TestValidateParquet:
         df = pd.DataFrame({"date_photo": []})
         with pytest.raises((ValueError, IndexError)):
             validate_parquet(df)
+

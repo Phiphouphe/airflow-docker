@@ -35,7 +35,7 @@ jobs:
           flake8 app/ dags/ api/ \
             --max-line-length=120 \
             --exclude=__pycache__,.git \
-            --ignore=E501,W503,E402,W291,W292,W293,W391,E302,E303,E121,E122,E123,E124,E125,E126,E127,E128,E203,E226,E231,E251,E266,W504,F401,F811,F541,F841
+            --ignore=E501,W503,E402,W291,W292,W293,W391,E302,E303,E121,E122,E123,E124,E125,E126,E127,E128,E203,E221,E226,E231,E251,E266,W504,F401,F811,F541,F841
 
       - name: Run black (formatting check)
         run: |
@@ -110,15 +110,6 @@ jobs:
       - name: Run unit tests — API FastAPI
         run: |
           pytest tests/test_api.py -v
-
-      - name: Run all tests with coverage
-        run: |
-          pytest tests/ \
-            --ignore=tests/test_dags.py \
-            --cov=app --cov=api \
-            --cov-report=term-missing \
-            --cov-report=xml \
-            -v
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

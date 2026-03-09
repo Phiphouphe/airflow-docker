@@ -109,11 +109,11 @@ departure_time_block → "morning", "afternoon", "evening", "night" selon heure 
 Next step : 
 - OK : Tester injection passée pour Weather si OK modifier les DAGs flights avec techniques Variables
 - OK : API : mettre à dispo les prédictions sur le front
-- Relire les tests, les comprendre, faire attention à la date en dur (doit être dynamique pour injection)
-- Comprendre le CI/CD
+- OK : Relire les tests, les comprendre, faire attention à la date en dur (doit être dynamique pour injection passée)
+- OK : Comprendre le CI/CD
 - Ajouter les GitHub Actions secrets
-- Tester 
-- GitHub Actions : Blue Green Deployment
+- Tester CI puis CD manuellement
+- GitHub Actions : Blue Green Deployment (pas nécessaire mais savoir l'expliquer)
 - Prometheus et Grafana
 - Refaire Power BI
 - PowerPoint
