@@ -2,3 +2,4 @@
 __pycache__
 logs
 flight_loader.py
+logs/
