@@ -4,6 +4,7 @@ import pendulum
 
 from datetime import timedelta
 from airflow import DAG
+from airflow.operators.python import ShortCircuitOperator
 from airflow.utils.task_group import TaskGroup
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -26,6 +27,39 @@ default_args = {
     'retries': 2,
     'retry_delay': timedelta(seconds=5),
 }
+
+
+def check_staging_ready():
+    import psycopg2
+    from airflow.hooks.base import BaseHook
+    from datetime import datetime, timedelta
+
+    conn_config = BaseHook.get_connection("flight_dw_postgres")
+    conn = psycopg2.connect(
+        host=conn_config.host, port=conn_config.port,
+        dbname=conn_config.schema, user=conn_config.login,
+        password=conn_config.password,
+    )
+
+    since = datetime.now() - timedelta(hours=2)
+    expected = {"NCE", "LYS", "MRS", "TLS", "BOD"}
+
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT origin_airport
+        FROM raw.raw_flights
+        WHERE execution_date >= %s
+    """, (since,))
+    found = {row[0] for row in cursor.fetchall()}
+    conn.close()
+
+    missing = expected - found
+    if missing:
+        print(f"⏳ Villes manquantes dans ce cycle : {missing}")
+        return False
+    print("✅ Toutes les villes prêtes pour staging")
+    return True
+
 
 with DAG(
     dag_id=DAG_ID,
@@ -57,8 +91,12 @@ with DAG(
         "owner_airline", "wifi_enabled",
     ]
 
+    task_check_staging_ready = ShortCircuitOperator(
+        task_id="check_staging_ready",
+        python_callable=check_staging_ready,
+    )
+
     with TaskGroup('extraction_db') as extraction_db:
-        # Extraction des données du vol de la veille (raw) depuis la base de données
         task_extract_db_raw_flights = DB_extraction(
             table_name="raw_flights",
             schema_name="raw",
@@ -69,7 +107,6 @@ with DAG(
             task_id="task_extract_db_raw_flights",
         )
 
-        # Extraction des données de vol du jour même (scheduled) depuis la base de données
         task_extract_db_scheduled_flights = DB_extraction(
             table_name="scheduled_flights",
             schema_name="raw",
@@ -82,9 +119,7 @@ with DAG(
 
         [task_extract_db_raw_flights, task_extract_db_scheduled_flights]
 
-
     with TaskGroup('convert_date_columns') as convert_date_columns:
-        # Conversion des dates pour le fichier raw (vols de la veille)
         task_convert_date_columns_raw_flights = DateConverter(
             input_file="task_extract_db_raw_flights",
             output_file="task_convert_date_columns_raw_flights",
@@ -94,7 +129,6 @@ with DAG(
             task_id="task_convert_date_columns_raw_flights",
         )
 
-        # Conversion des dates pour le fichier scheduled (vols du jour même)
         task_convert_date_columns_scheduled_flights = DateConverter(
             input_file="task_extract_db_scheduled_flights",
             output_file="task_convert_date_columns_scheduled_flights",
@@ -106,9 +140,7 @@ with DAG(
 
         [task_convert_date_columns_raw_flights, task_convert_date_columns_scheduled_flights]
 
-
     with TaskGroup('convert_type_columns') as convert_type_columns:
-        # Conversion des colonnes pour le fichier raw (vols de la veille)
         task_convert_type_columns_raw_flights = TypeConverter(
             input_file="task_convert_date_columns_raw_flights",
             output_file="task_convert_type_columns_raw_flights",
@@ -122,7 +154,6 @@ with DAG(
             task_id="task_convert_type_columns_raw_flights",
         )
 
-        # Conversion des colonnes pour le fichier scheduled (vols du jour même)
         task_convert_type_columns_scheduled_flights = TypeConverter(
             input_file="task_convert_date_columns_scheduled_flights",
             output_file="task_convert_type_columns_scheduled_flights",
@@ -138,9 +169,7 @@ with DAG(
 
         [task_convert_type_columns_raw_flights, task_convert_type_columns_scheduled_flights]
 
-
     with TaskGroup('duplicate_remover') as duplicate_remover:
-        # Suppression des doublons pour le fichier raw (vols de la veille)
         task_duplicate_remover_raw_flights = DuplicateRemover(
             input_file="task_convert_type_columns_raw_flights",
             output_file="task_duplicate_remover_raw_flights",
@@ -151,7 +180,6 @@ with DAG(
             task_id="task_duplicate_remover_raw_flights",
         )
 
-        # Suppression des doublons pour le fichier scheduled (vols du jour même)
         task_duplicate_remover_scheduled_flights = DuplicateRemover(
             input_file="task_convert_type_columns_scheduled_flights",
             output_file="task_duplicate_remover_scheduled_flights",
@@ -164,9 +192,7 @@ with DAG(
 
         [task_duplicate_remover_raw_flights, task_duplicate_remover_scheduled_flights]
 
-
     with TaskGroup('loading') as loading:
-        # Chargement du fichier raw dans la table staging.raw_flights
         task_load_raw_to_db = Parquet_to_snapshot2(
             table_name="raw_flights",
             schema="staging",
@@ -178,7 +204,6 @@ with DAG(
             task_id="task_load_raw_to_db",
         )
 
-        # Chargement du fichier scheduled dans la table staging.scheduled_flights
         task_load_scheduled_to_db = Parquet_to_snapshot2(
             table_name="scheduled_flights",
             schema="staging",
@@ -192,6 +217,5 @@ with DAG(
 
         [task_load_raw_to_db, task_load_scheduled_to_db]
 
-
     # Définition des dépendances entre les tâches
-    extraction_db >> convert_date_columns >> convert_type_columns >> duplicate_remover >> loading
+    task_check_staging_ready >> extraction_db >> convert_date_columns >> convert_type_columns >> duplicate_remover >> loading

@@ -117,6 +117,6 @@ Next step :
 - Prometheus et Grafana
 - Refaire Power BI
 - PowerPoint
-- Modifier la récup de la météo pour que analytics et ML DAGs se relancent toutes les 2h aussi. Donc modifier les tests aussi avec les schedules
+- OK : Modifier la récup de la météo pour que analytics et ML DAGs se relancent toutes les 2h aussi. Donc modifier les tests aussi avec les schedules
 - Mettre en place un UPSERT dans Parquet to snapshot pour faire face à la mise à jour des données provenant de l'API. Clé flight = flight_id et Clé météo = date + airport_iata
 

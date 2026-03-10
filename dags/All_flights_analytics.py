@@ -7,6 +7,7 @@ import calendar
 
 from datetime import timedelta
 from airflow import DAG
+from airflow.operators.python import ShortCircuitOperator
 from airflow.utils.task_group import TaskGroup
 from airflow.datasets import Dataset
 
@@ -23,11 +24,9 @@ from app.datasets import ana_flights_table, ana_scheduled_flights_table, stg_fli
                           stg_weather_table, stg_scheduled_weather_table
 
 
-# Définition du DAG
 DAG_ID = "All_flights_analytics"
 LIBELLE = "Transformation et enrichissement métier des données de vol"
 DESCRIPTION = "Transformation et enrichissement métier des données de vol depuis les tables 'raw' et 'staging' dans la base de données flight_dw."
-
 
 default_args = {
     'owner': 'airflow',
@@ -36,13 +35,62 @@ default_args = {
     'retry_delay': timedelta(seconds=5),
 }
 
+
+def check_analytics_ready():
+    import psycopg2
+    from airflow.hooks.base import BaseHook
+    from datetime import datetime, timedelta
+
+    conn_config = BaseHook.get_connection("flight_dw_postgres")
+    conn = psycopg2.connect(
+        host=conn_config.host, port=conn_config.port,
+        dbname=conn_config.schema, user=conn_config.login,
+        password=conn_config.password,
+    )
+
+    since = datetime.now() - timedelta(hours=2)
+    expected = {"NCE", "LYS", "MRS", "TLS", "BOD"}
+    cursor = conn.cursor()
+
+    # Vérifier les vols staging
+    cursor.execute("""
+        SELECT DISTINCT origin_airport
+        FROM staging.raw_flights
+        WHERE execution_date >= %s
+    """, (since,))
+    found_flights = {row[0] for row in cursor.fetchall()}
+
+    # Vérifier la météo staging
+    cursor.execute("""
+        SELECT DISTINCT airport_iata
+        FROM staging.raw_weather
+        WHERE execution_date >= %s
+    """, (since,))
+    found_weather = {row[0] for row in cursor.fetchall()}
+
+    conn.close()
+
+    missing_flights = expected - found_flights
+    missing_weather = expected - found_weather
+
+    if missing_flights:
+        print(f"⏳ Vols manquants dans staging : {missing_flights}")
+        return False
+    if missing_weather:
+        print(f"⏳ Météo manquante dans staging : {missing_weather}")
+        return False
+
+    print("✅ Vols et météo prêts pour analytics")
+    return True
+
+
 with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
     schedule=[stg_flights_table, stg_scheduled_flights_table,
-              stg_weather_table, stg_scheduled_weather_table,],
-    tags=["FLIGHTS", "WEATHER", "IATA","ANALYTICS"],
+              stg_weather_table, stg_scheduled_weather_table],
+    tags=["FLIGHTS", "WEATHER", "IATA", "ANALYTICS"],
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(minutes=10),
@@ -53,69 +101,72 @@ with DAG(
 ) as dag:
 
     TECHNICAL_COLUMNS = [
-    "date_photo", "semaine_photo", "annee_photo",
-    "execution_date", "instance_id", "dag_id"
+        "date_photo", "semaine_photo", "annee_photo",
+        "execution_date", "instance_id", "dag_id"
     ]
-    
+
+    task_check_analytics_ready = ShortCircuitOperator(
+        task_id="check_analytics_ready",
+        python_callable=check_analytics_ready,
+    )
+
     with TaskGroup('extraction_db') as extraction_db:
-        # Extraction des données du vol de la veille (raw) depuis la base de données
         task_extract_db_raw_flights = DB_extraction(
-        table_name="raw_flights",
-        schema_name="staging",
-        columns=["flight_id", 
-                "flight_number", 
-                "airline_code", 
-                "date",
-                "scheduled_departure", 
-                "actual_departure",
-                "scheduled_arrival", 
-                "actual_arrival",
-                "origin_airport", 
-                "destination_airport",
-                "status", 
-                "delay_minutes", 
-                "delay_code",
-                "registration", 
-                "type_code", 
-                "type_name",
-                "owner_airline", 
-                "wifi_enabled",
-        ] + TECHNICAL_COLUMNS,
-        airflow_variable_date_photo="date_photo_raw_flights",
-        database_conn_id="flight_dw_postgres",
-        output_parquet_file="task_extract_db_raw_flights",
-        task_id="task_extract_db_raw_flights",
+            table_name="raw_flights",
+            schema_name="staging",
+            columns=["flight_id",
+                     "flight_number",
+                     "airline_code",
+                     "date",
+                     "scheduled_departure",
+                     "actual_departure",
+                     "scheduled_arrival",
+                     "actual_arrival",
+                     "origin_airport",
+                     "destination_airport",
+                     "status",
+                     "delay_minutes",
+                     "delay_code",
+                     "registration",
+                     "type_code",
+                     "type_name",
+                     "owner_airline",
+                     "wifi_enabled",
+            ] + TECHNICAL_COLUMNS,
+            airflow_variable_date_photo="date_photo_raw_flights",
+            database_conn_id="flight_dw_postgres",
+            output_parquet_file="task_extract_db_raw_flights",
+            task_id="task_extract_db_raw_flights",
         )
 
-        # Extraction des données de vol du jour même (scheduled) depuis la base de données
         task_extract_db_scheduled_flights = DB_extraction(
-        table_name="scheduled_flights",
-        schema_name="staging",
-        columns=["flight_id", 
-                "flight_number", 
-                "airline_code", 
-                "date",
-                "scheduled_departure", 
-                "actual_departure",
-                "scheduled_arrival", 
-                "actual_arrival",
-                "origin_airport", 
-                "destination_airport",
-                "status", 
-                "delay_minutes", 
-                "delay_code",
-                "registration", 
-                "type_code", 
-                "type_name",
-                "owner_airline", "wifi_enabled",
-        ] + TECHNICAL_COLUMNS,
-        airflow_variable_date_photo="date_photo_scheduled_flights",
-        database_conn_id="flight_dw_postgres",
-        output_parquet_file="task_extract_db_scheduled_flights",
-        task_id="task_extract_db_scheduled_flights",
+            table_name="scheduled_flights",
+            schema_name="staging",
+            columns=["flight_id",
+                     "flight_number",
+                     "airline_code",
+                     "date",
+                     "scheduled_departure",
+                     "actual_departure",
+                     "scheduled_arrival",
+                     "actual_arrival",
+                     "origin_airport",
+                     "destination_airport",
+                     "status",
+                     "delay_minutes",
+                     "delay_code",
+                     "registration",
+                     "type_code",
+                     "type_name",
+                     "owner_airline",
+                     "wifi_enabled",
+            ] + TECHNICAL_COLUMNS,
+            airflow_variable_date_photo="date_photo_scheduled_flights",
+            database_conn_id="flight_dw_postgres",
+            output_parquet_file="task_extract_db_scheduled_flights",
+            task_id="task_extract_db_scheduled_flights",
         )
 
-        # Extraction des données référentielles des codes IATA depuis la base de données
         task_extract_db_iata_codes = DB_extraction(
             table_name="iata_delay_codes",
             schema_name="ref",
@@ -126,7 +177,6 @@ with DAG(
             output_parquet_file="task_extract_db_iata_codes",
         )
 
-        # Extraction des données référentielles des codes Météo depuis la base de données
         task_extract_db_weather_codes = DB_extraction(
             table_name="weather_codes",
             schema_name="ref",
@@ -137,7 +187,6 @@ with DAG(
             output_parquet_file="task_extract_db_weather_codes",
         )
 
-        # Extraction des données météo de la veille depuis la base de données
         task_extract_db_raw_weather = DB_extraction(
             table_name="raw_weather",
             schema_name="staging",
@@ -150,7 +199,6 @@ with DAG(
             output_parquet_file="task_extract_db_raw_weather",
         )
 
-        # Extraction des données météo du jour courant depuis la base de données
         task_extract_db_scheduled_weather = DB_extraction(
             table_name="scheduled_weather",
             schema_name="staging",
@@ -163,10 +211,10 @@ with DAG(
             output_parquet_file="task_extract_db_scheduled_weather",
         )
 
-        [task_extract_db_raw_flights, task_extract_db_scheduled_flights, task_extract_db_iata_codes, task_extract_db_raw_weather, task_extract_db_scheduled_weather]
-    
+        [task_extract_db_raw_flights, task_extract_db_scheduled_flights, task_extract_db_iata_codes,
+         task_extract_db_raw_weather, task_extract_db_scheduled_weather]
+
     with TaskGroup('extractor_array') as extractor_array:
-        # Conversion des types de colonnes pour le fichier raw (vols de la veille)
         task_extract_array_raw_flights = PostgresArrayExtractor(
             input_file="task_extract_db_raw_flights",
             output_file="task_extract_array_raw_flights",
@@ -175,7 +223,6 @@ with DAG(
             task_id="task_extract_array_raw_flights",
         )
 
-        # Conversion des types de colonnes pour le fichier scheduled (vols du jour même)
         task_extract_array_scheduled_flights = PostgresArrayExtractor(
             input_file="task_extract_db_scheduled_flights",
             output_file="task_extract_array_scheduled_flights",
@@ -187,39 +234,29 @@ with DAG(
         [task_extract_array_raw_flights, task_extract_array_scheduled_flights]
 
     with TaskGroup('join_tables_raw') as join_tables_raw:
-        # Jointure des données de vol de la veille (raw) avec les données météo correspondantes
         task_join_raw_flights_weather = ParquetJoin(
             left_file="task_extract_array_raw_flights",
             right_file="task_extract_db_raw_weather",
-            on={
-                "date": "date",
-                "origin_airport": "airport_iata",
-            },
+            on={"date": "date", "origin_airport": "airport_iata"},
             how="left",
             output_file="task_join_raw_flights_weather",
             task_id="task_join_raw_flights_weather"
         )
 
-        # Jointure des données de vol de la veille (raw) avec les données de codes météo
         task_join_raw_flights_weather_codes = ParquetJoin(
             left_file="task_join_raw_flights_weather",
             right_file="task_extract_db_weather_codes",
-            on={
-                "weather_code":"code",
-            },
+            on={"weather_code": "code"},
             how="left",
             rename_right={"description": "weather_description"},
             output_file="task_join_raw_flights_weather_codes",
             task_id="task_join_raw_flights_weather_codes"
         )
 
-        # Jointure des données de vol de la veille (raw) avec les données IATA correspondantes
         task_join_raw_flights_iata = ParquetJoin(
             left_file="task_join_raw_flights_weather_codes",
             right_file="task_extract_db_iata_codes",
-            on={
-                "delay_code": "id",
-            },
+            on={"delay_code": "id"},
             how="left",
             rename_right={"code": "code_iata", "title": "title_iata", "description": "description_iata"},
             output_file="task_join_raw_flights_iata",
@@ -229,39 +266,29 @@ with DAG(
         task_join_raw_flights_weather >> task_join_raw_flights_weather_codes >> task_join_raw_flights_iata
 
     with TaskGroup('join_tables_scheduled') as join_tables_scheduled:
-        # Jointure des données de vol du jour même (scheduled) avec les données météo correspondantes
         task_join_scheduled_flights_weather = ParquetJoin(
             left_file="task_extract_array_scheduled_flights",
             right_file="task_extract_db_scheduled_weather",
-            on={
-                "date": "date",
-                "origin_airport": "airport_iata",
-            },
+            on={"date": "date", "origin_airport": "airport_iata"},
             how="left",
             output_file="task_join_scheduled_flights_weather",
             task_id="task_join_scheduled_flights_weather"
         )
 
-        # Jointure des données de vol du jour même (scheduled) avec les données de codes météo
         task_join_scheduled_flights_weather_codes = ParquetJoin(
             left_file="task_join_scheduled_flights_weather",
             right_file="task_extract_db_weather_codes",
-            on={
-                "weather_code":"code",
-            },
+            on={"weather_code": "code"},
             how="left",
             rename_right={"description": "weather_description"},
             output_file="task_join_scheduled_flights_weather_codes",
             task_id="task_join_scheduled_flights_weather_codes"
         )
 
-        # Jointure des données de vol du jour même (scheduled) avec les données IATA correspondantes
         task_join_scheduled_flights_iata = ParquetJoin(
             left_file="task_join_scheduled_flights_weather_codes",
             right_file="task_extract_db_iata_codes",
-            on={
-                "delay_code": "id",
-            },
+            on={"delay_code": "id"},
             how="left",
             rename_right={"code": "code_iata", "title": "title_iata", "description": "description_iata"},
             output_file="task_join_scheduled_flights_iata",
@@ -271,7 +298,6 @@ with DAG(
         task_join_scheduled_flights_weather >> task_join_scheduled_flights_weather_codes >> task_join_scheduled_flights_iata
 
     with TaskGroup('remove_columns') as remove_columns:
-        # Suppression des colonnes intermédiaires après jointure pour le fichier raw (vols de la veille)
         task_remove_columns_raw_flights = ColumnRemover(
             input_file="task_join_raw_flights_iata",
             output_file="task_remove_columns_raw_flights",
@@ -279,7 +305,6 @@ with DAG(
             task_id="task_remove_columns_raw_flights",
         )
 
-        # Suppression des colonnes intermédiaires après jointure pour le fichier scheduled (vols du jour même)
         task_remove_columns_scheduled_flights = ColumnRemover(
             input_file="task_join_scheduled_flights_iata",
             output_file="task_remove_columns_scheduled_flights",
@@ -287,23 +312,20 @@ with DAG(
             task_id="task_remove_columns_scheduled_flights",
         )
 
-        [task_remove_columns_raw_flights, task_remove_columns_scheduled_flights]    
+        [task_remove_columns_raw_flights, task_remove_columns_scheduled_flights]
 
     with TaskGroup('apply_business_functions') as apply_business_functions:
 
-        ## Colonnes temporelles pour ML
-        # Fonction qui calcule le jour de la semaine à partir de la date du vol
         def compute_day_of_week(row):
             try:
                 if pd.isna(row["date"]):
                     return None
-                day_num = pd.to_datetime(row["date"]).dayofweek  # 0 = lundi
-                return day_num + 1  # 1 = lundi, …, 7 = dimanche
+                day_num = pd.to_datetime(row["date"]).dayofweek
+                return day_num + 1
             except Exception as e:
                 logging.warning(f"Erreur compute_day_of_week_one_index pour row {row.name}: {e}")
                 return None
 
-        # Fonction qui calcule le mois à partir de la date du vol
         def compute_month(row):
             try:
                 if pd.isna(row["date"]):
@@ -313,7 +335,6 @@ with DAG(
                 logging.warning(f"Erreur compute_month pour row {row.name}: {e}")
                 return None
 
-        # Fonction qui calcule l'heure de départ prévue à partir de la colonne "scheduled_departure"
         def compute_dep_hour(row):
             try:
                 if pd.isna(row["scheduled_departure"]):
@@ -323,7 +344,6 @@ with DAG(
                 logging.warning(f"Erreur compute_dep_hour pour row {row.name}: {e}")
                 return None
 
-        # Fonction qui calcule l'heure d'arrivée prévue à partir de la colonne "scheduled_arrival"
         def compute_arr_hour(row):
             try:
                 if pd.isna(row["scheduled_arrival"]):
@@ -332,14 +352,13 @@ with DAG(
             except Exception as e:
                 logging.warning(f"Erreur compute_arr_hour pour row {row.name}: {e}")
                 return None
-            
-        ## Colonnes lisibles pour reporting
+
         def compute_day_name(row):
             try:
                 if pd.isna(row["date"]):
                     return None
-                day_num = pd.to_datetime(row["date"]).dayofweek  # 0 = lundi
-                return calendar.day_name[day_num]               # "Monday", "Tuesday", ...
+                day_num = pd.to_datetime(row["date"]).dayofweek
+                return calendar.day_name[day_num]
             except Exception as e:
                 logging.warning(f"Erreur compute_day_name pour row {row.name}: {e}")
                 return None
@@ -348,14 +367,12 @@ with DAG(
             try:
                 if pd.isna(row["date"]):
                     return None
-                month_num = pd.to_datetime(row["date"]).month    # 1 = janvier
-                return calendar.month_name[month_num]           # "January", "February", ...
+                month_num = pd.to_datetime(row["date"]).month
+                return calendar.month_name[month_num]
             except Exception as e:
                 logging.warning(f"Erreur compute_month_name pour row {row.name}: {e}")
                 return None
-        
-        ## Colonne métier
-        # Fonction qui calcule le retard des avions en minutes à leur arrivée
+
         def compute_delay_minutes(row):
             if (
                 pd.notna(row["actual_arrival"]) and
@@ -365,11 +382,10 @@ with DAG(
                 return (row["actual_arrival"] - row["scheduled_arrival"]).total_seconds() / 60
             return None
 
-        # Chargement des données de vol de la veille (raw)
         task_apply_functions_raw_flights = ApplyFunction(
             input_file="task_remove_columns_raw_flights",
             output_file="task_apply_functions_raw_flights",
-            columns_functions = {
+            columns_functions={
                 "day_of_week": compute_day_of_week,
                 "month": compute_month,
                 "dep_hour": compute_dep_hour,
@@ -398,15 +414,14 @@ with DAG(
                 ),
                 "is_cancelled": lambda row: row["status"] == "CANCELLED",
                 "is_landed": lambda row: row["status"] == "ARRIVED",
-                },
+            },
             task_id="task_apply_functions_raw_flights",
         )
 
-        # Chargement des données de vol du jour même (scheduled)
         task_apply_functions_scheduled_flights = ApplyFunction(
             input_file="task_remove_columns_scheduled_flights",
             output_file="task_apply_functions_scheduled_flights",
-            columns_functions = {
+            columns_functions={
                 "day_of_week": compute_day_of_week,
                 "month": compute_month,
                 "dep_hour": compute_dep_hour,
@@ -425,41 +440,28 @@ with DAG(
             task_id="task_apply_functions_scheduled_flights",
         )
 
-        [task_apply_functions_raw_flights, task_apply_functions_scheduled_flights]   
+        [task_apply_functions_raw_flights, task_apply_functions_scheduled_flights]
 
     with TaskGroup('version_selector') as version_selector:
-        # Sélection de la version finale des données de vol de la veille (raw)
         task_select_final_version_raw_flights = VersionSelector(
             input_file="task_apply_functions_raw_flights",
             output_file="task_select_final_version_raw_flights",
-            key_columns=["flight_id", 
-                         "flight_number",
-                         "date",
-                         "origin_airport",
-                         "destination_airport",
-                         ],
+            key_columns=["flight_id", "flight_number", "date", "origin_airport", "destination_airport"],
             date_column="date_photo",
             task_id="task_select_final_version_raw_flights",
         )
 
-        # Sélection de la version finale des données de vol du jour même (scheduled)
         task_select_final_version_scheduled_flights = VersionSelector(
             input_file="task_apply_functions_scheduled_flights",
             output_file="task_select_final_version_scheduled_flights",
-            key_columns=["flight_id", 
-                         "flight_number",
-                         "date",
-                         "origin_airport",
-                         "destination_airport",
-                         ],
+            key_columns=["flight_id", "flight_number", "date", "origin_airport", "destination_airport"],
             date_column="date_photo",
             task_id="task_select_final_version_scheduled_flights",
         )
 
         [task_select_final_version_raw_flights, task_select_final_version_scheduled_flights]
-    
+
     with TaskGroup('loading') as loading:
-        # Chargement du fichier raw dans la table raw_flights                                                  
         task_load_raw_to_db = Parquet_to_snapshot2(
             table_name="raw_flights",
             schema="analytics",
@@ -471,7 +473,6 @@ with DAG(
             task_id="task_load_raw_to_db",
         )
 
-        # Chargement du fichier scheduled dans la table scheduled_flights
         task_load_scheduled_to_db = Parquet_to_snapshot2(
             table_name="scheduled_flights",
             schema="analytics",
@@ -484,9 +485,6 @@ with DAG(
         )
 
         [task_load_raw_to_db, task_load_scheduled_to_db]
-    
-    
-    # Définition des dépendances entre les tâches
-    # Les données de vol "raw" et "scheduled" suivent des chemins parallèles d'extraction, de transformation et de chargement.
 
-    extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> version_selector >> loading
+    # Définition des dépendances entre les tâches
+    task_check_analytics_ready >> extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> version_selector >> loading
