@@ -25,3 +25,7 @@ GRAFANA_ADMIN_PASSWORD=mot_de_passe
 
 # -------- ALERT --------
 GMAIL_APP_PASSWORD=ton_mot_de_passe_app
+
+# -------- GITHUB --------
+GITHUB_TOKEN=ton_token
+GITHUB_REPO=ton_username/dossier_projet

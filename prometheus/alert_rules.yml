@@ -11,13 +11,13 @@ groups:
           description: "Le service Airflow ne répond plus depuis 1 minute."
 
       - alert: DAGFailed
-        expr: sum(airflow_dag_status{status="failed"}) > 0
+        expr: sum(airflow_dag_last_status{status="failed"}) > 0
         for: 1m
         labels:
           severity: warning
         annotations:
           summary: "Un DAG a échoué"
-          description: "Au moins un DAG est en statut failed."
+          description: "Le dernier run d'un DAG est en statut failed."
 
   - name: service_alerts
     rules:

@@ -68,6 +68,8 @@ x-airflow-common:
     MLFLOW_TRACKING_URI: http://mlflow:5000
     AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 60
     AIRFLOW__DAG_PROCESSOR__FILE_PROCESS_INTERVAL: 60
+    GITHUB_TOKEN: ${GITHUB_TOKEN}
+    GITHUB_REPO: ${GITHUB_REPO}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -418,7 +420,7 @@ services:
   api:
     build:
       context: ./api
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     container_name: flight_api
     env_file:
       - .env
@@ -473,6 +475,14 @@ services:
     ports:
       - "3000:3000"
 
+  # ---------------- PUSHGATEWAY ----------------
+  pushgateway:
+    image: prom/pushgateway:v1.7.0
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    restart: always
+
   # ---------------- ALERTMANAGER ----------------
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -489,6 +499,18 @@ services:
       /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml &&
       alertmanager --config.file=/tmp/alertmanager.yml"
   
+  # ---------------- WEBHOOK ----------------
+  webhook:
+    build:
+      context: ./webhook
+      dockerfile: dockerfile
+    container_name: webhook
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/ubuntu/airflow-docker:/home/ubuntu/airflow-docker
+    ports:
+      - "9099:9099"
+    restart: always
 
 volumes:
   postgres-db-volume:
