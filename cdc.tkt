@@ -111,11 +111,12 @@ Next step :
 - OK : API : mettre à dispo les prédictions sur le front
 - OK : Relire les tests, les comprendre, faire attention à la date en dur (doit être dynamique pour injection passée)
 - OK : Comprendre le CI/CD
-- Ajouter les GitHub Actions secrets
-- Tester CI puis CD manuellement
+- OK : Ajouter les GitHub Actions secrets
+- OK 1/2 : Tester CI puis CD manuellement
 - GitHub Actions : Blue Green Deployment (pas nécessaire mais savoir l'expliquer)
 - Prometheus et Grafana
 - Refaire Power BI
 - PowerPoint
+- Modifier la récup de la météo pour que analytics et ML DAGs se relancent toutes les 2h aussi. Donc modifier les tests aussi avec les schedules
 - Mettre en place un UPSERT dans Parquet to snapshot pour faire face à la mise à jour des données provenant de l'API. Clé flight = flight_id et Clé météo = date + airport_iata
 
