@@ -10,10 +10,13 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 1h
-  receiver: 'email'
+  receiver: 'email-webhook'
 
 receivers:
-  - name: 'email'
+  - name: 'email-webhook'
     email_configs:
       - to: 'philistineserour@neuf.fr'
+        send_resolved: true
+    webhook_configs:
+      - url: 'http://webhook:9099/webhook'
         send_resolved: true
