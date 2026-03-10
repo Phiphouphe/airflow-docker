@@ -59,7 +59,7 @@ jobs:
 
     environment:
       name: ${{ github.event.inputs.environment }}
-      url: http://${{ secrets.EC2_HOST }}:8501  # Streamlit
+      url: http://35.180.198.137:8501
 
     steps:
       - name: Checkout code
