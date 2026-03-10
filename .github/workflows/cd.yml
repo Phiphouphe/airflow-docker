@@ -35,7 +35,8 @@ jobs:
         run: |
           pip install pytest pandas numpy fastapi httpx \
             python-jose[cryptography] passlib[bcrypt] bcrypt==4.0.1 \
-            python-multipart python-dotenv sqlalchemy psycopg2-binary
+            python-multipart python-dotenv sqlalchemy psycopg2-binary \
+            prometheus-fastapi-instrumentator
 
       - name: Run critical tests before deploy
         run: |
