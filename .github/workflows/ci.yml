@@ -5,6 +5,7 @@ on:
     branches:
       - feature_philistine
       - develop
+      - main
   pull_request:
     branches:
       - develop
@@ -87,7 +88,8 @@ jobs:
             "python-jose[cryptography]" "passlib[bcrypt]" \
             "bcrypt==4.0.1" \
             python-multipart python-dotenv \
-            sqlalchemy psycopg2-binary
+            sqlalchemy psycopg2-binary \
+            prometheus-fastapi-instrumentator
 
       - name: Initialize Airflow DB
         run: |
