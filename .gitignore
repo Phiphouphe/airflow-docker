@@ -4,3 +4,5 @@ logs
 flight_loader.py
 logs/logs/
 temp/
+logs/
+temp/
