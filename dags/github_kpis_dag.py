@@ -1,9 +1,11 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from datetime import datetime, timedelta
 import os
 import requests
-from datetime import timezone
+
+from datetime import timezone, datetime, timedelta
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+
 
 default_args = {
     'owner': 'airflow',
@@ -58,6 +60,7 @@ def collect_github_kpis():
         data=metrics,
         headers={"Content-Type": "text/plain"}
     )
+
 
 with DAG(
     dag_id="github_kpis_collector",
