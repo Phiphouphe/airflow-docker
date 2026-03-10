@@ -1,4 +1,5 @@
 .env
-__pycache__
-logs
-flight_loader.pylogs/
+__pycache__/
+logs/
+temp/
+flight_loader.py

@@ -1,15 +1,9 @@
-FROM apache/airflow:3.1.5
+FROM apache/airflow:3.0.6
 
 USER airflow
 
-RUN pip install --upgrade pip
+COPY requirements.txt .
 
-RUN pip install --no-cache-dir \
-    pandas==2.1.4 \
-    scikit-learn==1.4.0 \
-    requests \
-    psycopg2-binary \
-    pyarrow \
-    mlflow==2.12.1
-
-RUN pip install --no-cache-dir --no-build-isolation xgboost==1.7.6
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir --no-build-isolation xgboost==1.7.6

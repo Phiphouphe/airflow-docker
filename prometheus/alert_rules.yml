@@ -1,0 +1,32 @@
+groups:
+  - name: airflow_alerts
+    rules:
+      - alert: AirflowDown
+        expr: up{job="airflow"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Airflow est down"
+          description: "Le service Airflow ne répond plus depuis 1 minute."
+
+      - alert: DAGFailed
+        expr: sum(airflow_dag_status{status="failed"}) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Un DAG a échoué"
+          description: "Au moins un DAG est en statut failed."
+
+  - name: service_alerts
+    rules:
+      - alert: FastAPIDown
+        expr: up{job="fastapi"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FastAPI est down"
+          description: "Le service FastAPI ne répond plus depuis 1 minute."
+

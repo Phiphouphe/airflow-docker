@@ -19,16 +19,16 @@ from app.tasks.Transform.TechnicalInfo import TechnicalInfo
 from app.tasks.Load.Parquet_to_snapshot import Parquet_to_snapshot
 from app.tasks.Load.Parquet_to_snapshot2 import Parquet_to_snapshot2
 from app.static.extract_flights import extract_flights
-from app.datasets import raw_flights_nice_done, raw_scheduled_flights_nice_done
+from app.datasets import raw_flights_bordeaux_done, raw_scheduled_flights_bordeaux_done
 
 
 # Importation de la clé API depuis les Variables Airflow
 API_KEY = Variable.get("AIRFRANCE_API_KEY", default_var=None)
 
 # Définition du DAG
-DAG_ID = "API_NICE_flights_raw"
+DAG_ID = "API_BORDEAUX_flights_raw"
 LIBELLE = "Import des datas vol pour les étapes Raw et Staging via API"
-DESCRIPTION = "Import des données de vol en partance de NICE depuis une API externe (Air France) vers la base de données flight_dw."
+DESCRIPTION = "Import des données de vol en partance de BORDEAUX depuis une API externe (Air France) vers la base de données flight_dw."
 
 
 default_args = {
@@ -42,14 +42,14 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule="0 5,7,9,11,13,15,17,19 * * *",
-    tags=["API", "FLIGHTS", "IMPORT", "RAW", "NICE",],
+    schedule="15 5,7,9,11,13,15,17,19 * * *",
+    tags=["API", "FLIGHTS", "IMPORT", "RAW", "BORDEAUX",],
     catchup=False,
     max_active_runs=1,
     dagrun_timeout=timedelta(minutes=15),
     description=DESCRIPTION,
     doc_md="""
-            Import des données de vol du jour (scheduled) et de la veille (raw) à l'origine de NICE depuis une API externe vers la base de données flight_dw.
+            Import des données de vol du jour (scheduled) et de la veille (raw) à l'origine de BORDEAUX depuis une API externe vers la base de données flight_dw.
         """
 ) as dag:
 
@@ -63,7 +63,7 @@ with DAG(
                     "carrierCode": "AF",
                     "operatingAirlineCode": "AF",
                     "movementType": "A",
-                    "origin": "NCE",
+                    "origin": "BOD",
                     },
             output_parquet_file="task_extract_API_raw_flights",
             transform_function=extract_flights,
@@ -81,7 +81,7 @@ with DAG(
                     "carrierCode": "AF",
                     "operatingAirlineCode": "AF",
                     "movementType": "A",
-                    "origin": "NCE",
+                    "origin": "BOD",
                     },
             output_parquet_file="task_extract_API_scheduled_flights",
             transform_function=extract_flights,
@@ -118,7 +118,7 @@ with DAG(
             api_type="airfrance",
             input_parquet_file="task_add_technical_info_raw",
             database_conn_id="flight_dw_postgres",
-            outlets=[raw_flights_nice_done],
+            outlets=[raw_flights_bordeaux_done],
             task_id="task_load_raw_to_db",
         )
 
@@ -130,7 +130,7 @@ with DAG(
             api_type="airfrance",
             input_parquet_file="task_add_technical_info_scheduled",
             database_conn_id="flight_dw_postgres",
-            outlets=[raw_scheduled_flights_nice_done],
+            outlets=[raw_scheduled_flights_bordeaux_done],
             task_id="task_load_scheduled_to_db",
         )
 

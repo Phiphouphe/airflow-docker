@@ -44,11 +44,16 @@ class Load_to_database(PythonOperator):
         self._if_exists = if_exists
         self._have_chunksize = have_chunksize
         self._task_id = task_id
+
+        # 👇 Déplacer ici depuis _run()
+        # dataset = helper.get_postgres_dataset(database_conn_id, table_name, schema_name)
+
         
         super().__init__(
             task_id=task_id,
             python_callable=self._run,
             execution_timeout=execution_timeout,
+            # outlets=[dataset],
             **kwargs,
         )
 
@@ -64,9 +69,6 @@ class Load_to_database(PythonOperator):
         
         # Récupérer le moteur de connexion à la base de données
         engine = ConnectorDb.get_db_engine(self._db_conn_id)
-
-        # Récupérer le dataset pour la table cible (pour les outlets)
-        dataset = helper.get_postgres_dataset(self._db_conn_id, self._table_name, self._schema_name)
 
         # Charger les données dans la table PostgreSQL
         try:

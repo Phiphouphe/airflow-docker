@@ -1,0 +1,208 @@
+name: CI — Tests & Lint
+
+on:
+  push:
+    branches:
+      - feature_philistine
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+
+  # ── Job 1 : Lint & qualité du code ─────────────────────────────────────────
+  lint:
+    name: Lint & Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint dependencies
+        run: |
+          pip install flake8 black bandit
+
+      - name: Run flake8 (syntax & style)
+        run: |
+          flake8 app/ dags/ api/ \
+            --max-line-length=120 \
+            --exclude=__pycache__,.git \
+            --ignore=E501,W503,E402,W291,W292,W293,W391,E302,E303,E121,E122,E123,E124,E125,E126,E127,E128,E203,E221,E226,E231,E251,E266,W504,F401,F811,F541,F841
+
+      - name: Run black (formatting check)
+        run: |
+          black --check --line-length=120 app/ dags/ api/
+        continue-on-error: true  # warning uniquement, ne bloque pas la CI
+
+      - name: Run bandit (security check)
+        run: |
+          bandit -r app/ api/ -ll -ii
+        continue-on-error: true  # warning uniquement
+
+
+  # ── Job 2 : Tests unitaires ─────────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    env:
+      AIRFLOW_HOME: /tmp/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "sqlite:////tmp/airflow/airflow.db"
+      API_SECRET_KEY: "test_secret_key_for_ci"
+      API_ADMIN_PASSWORD: "admin"
+      API_USER_PASSWORD: "user"
+      POSTGRES_USER_API: "test"
+      POSTGRES_PASSWORD_API: "test"
+      POSTGRES_HOST_API: "localhost"
+      POSTGRES_PORT_API: "5432"
+      POSTGRES_DB_API: "test"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install \
+            pytest pytest-cov \
+            mlflow \
+            apache-airflow==2.9.0 \
+            pandas numpy \
+            fastapi httpx \
+            "python-jose[cryptography]" "passlib[bcrypt]" \
+            "bcrypt==4.0.1" \
+            python-multipart python-dotenv \
+            sqlalchemy psycopg2-binary \
+            prometheus-fastapi-instrumentator
+
+      - name: Initialize Airflow DB
+        run: |
+          airflow db migrate
+
+      - name: Run unit tests — DB_extraction
+        run: |
+          pytest tests/test_db_extraction.py -v
+
+      - name: Run unit tests — DuplicateRemover
+        run: |
+          pytest tests/test_duplicate_remover.py -v
+
+      - name: Run unit tests — DateConverter
+        run: |
+          pytest tests/test_date_converter.py -v
+
+      - name: Run unit tests — Parquet_to_snapshot2
+        run: |
+          pytest tests/test_parquet_to_snapshot2.py -v
+
+      - name: Run unit tests — API FastAPI
+        run: |
+          pytest tests/test_api.py -v
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+      - name: Run unit tests — Integration (mocked)
+        run: |
+          pytest tests/test_integration.py -v
+
+      - name: Run all tests with coverage
+        run: |
+          pytest tests/ \
+            --ignore=tests/test_dags.py \
+            --cov=app --cov=api \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            -v
+
+  # ── Job 3 : Tests DAGs Airflow ──────────────────────────────────────────────
+  dag-tests:
+    name: DAG Integrity Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    env:
+      AIRFLOW_HOME: /tmp/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "sqlite:////tmp/airflow/airflow.db"
+      AIRFLOW__CORE__DAGS_FOLDER: "${{ github.workspace }}/dags"
+      PYTHONPATH: "${{ github.workspace }}"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Airflow & dependencies
+        run: |
+          pip install \
+            pytest \
+            apache-airflow==2.9.0 \
+            pandas numpy sqlalchemy psycopg2-binary \
+            scikit-learn xgboost mlflow \
+            apache-airflow-providers-postgres \
+            apache-airflow-providers-standard
+          # Installer app/ comme package pip editable
+          pip install -e .
+
+      - name: Initialize Airflow DB
+        run: |
+          airflow db migrate
+
+      - name: Debug PYTHONPATH
+        run: |
+          echo "PYTHONPATH=$PYTHONPATH"
+          python -c "import sys; print('\n'.join(sys.path))"
+          ls ${{ github.workspace }}/app/ | head -5
+
+      - name: Run DAG integrity tests
+        run: |
+          pytest tests/test_dags.py -v
+
+
+  # ── Job 4 : Build Docker ─────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build API image
+        run: |
+          docker build -t flight-api:ci ./api
+        continue-on-error: false
+
+      - name: Build Streamlit image
+        run: |
+          docker build -t flight-streamlit:ci ./streamlit
+        continue-on-error: false
+
+      - name: Verify images built
+        run: |
+          docker images | grep flight

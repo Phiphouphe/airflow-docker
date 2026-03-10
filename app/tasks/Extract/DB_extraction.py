@@ -18,10 +18,11 @@ class DB_extraction(PythonOperator):
             schema_name: str,
             output_parquet_file: str,
             database_conn_id: str = "flight_dw_postgres",
-            columns: list[str] | str = "*",   
-            where_clause: str | None = None,          
-            limit_clause: int | None = None,         
+            columns: list[str] | str = "*",
+            where_clause: str | None = None,
+            limit_clause: int | None = None,
             query: str = None,
+            airflow_variable_date_photo: str | None = None,
             execution_timeout: timedelta = timedelta(minutes=5),
             task_id: str = "DB_extraction",
             **kwargs,
@@ -33,12 +34,15 @@ class DB_extraction(PythonOperator):
         - table_name (str) : Nom de la table PostgreSQL source.
         - schema_name (str) : Nom du schéma PostgreSQL source.
         - output_parquet_file (str) : Nom du fichier de sortie.
-        - database_conn_id (str, optionnel) : Identifiant de connexion Airflow pour la base de données PostgreSQL. Par défaut "postgres_api".
+        - database_conn_id (str, optionnel) : Identifiant de connexion Airflow pour la base de données PostgreSQL. Par défaut "flight_dw_postgres".
         - columns (list[str] | str, optionnel) : Colonnes à sélectionner. Par défaut "*".
         - where_clause (str | None, optionnel) : Clause WHERE SQL. Par défaut None.
         - limit_clause (int | None, optionnel) : Clause LIMIT SQL. Par défaut None.
         - query (str, optionnel) : Requête SQL personnalisée. Par défaut None. Si fournie, les autres paramètres sont ignorés.
-        - execution_timeout (timedelta, optionnel) : Durée maximale d’exécution de la tâche Airflow. Par défaut 5 minutes.
+        - airflow_variable_date_photo (str | None, optionnel) : Nom de la Variable Airflow contenant la date_photo à filtrer.
+                                                                 Permet de filtrer les données par date_photo sans dépendre du contexte Airflow.
+                                                                 Utilisé pour les DAGs déclenchés par asset. Par défaut None.
+        - execution_timeout (timedelta, optionnel) : Durée maximale d'exécution de la tâche Airflow. Par défaut 5 minutes.
         - task_id (str, optionnel) : Identifiant de la tâche Airflow. Par défaut "DB_extraction".
         """
 
@@ -50,6 +54,7 @@ class DB_extraction(PythonOperator):
         self._where_clause = where_clause
         self._limit_clause = limit_clause
         self._query = query
+        self._airflow_variable_date_photo = airflow_variable_date_photo
 
         super().__init__(
             task_id=task_id,
@@ -58,7 +63,18 @@ class DB_extraction(PythonOperator):
             **kwargs,
         )
 
-    def _run(self):
+    def _run(self, **context):
+
+        # Lire date_photo depuis Variable Airflow si configuré
+        # Utilisé quand le DAG est déclenché par asset et que logical_date n'est pas disponible
+        if self._airflow_variable_date_photo and not self._where_clause and not self._query:
+            try:
+                from airflow.models import Variable
+                date_photo_filter = Variable.get(self._airflow_variable_date_photo)
+                self._where_clause = f"date_photo = '{date_photo_filter}'"
+                logging.info(f"📅 Filtre date_photo appliqué depuis Variable Airflow : {date_photo_filter}")
+            except Exception:
+                logging.warning(f"⚠️ Variable {self._airflow_variable_date_photo} non trouvée — extraction sans filtre")
 
         # Génération de la requête
         query = self._build_query()
@@ -109,4 +125,3 @@ class DB_extraction(PythonOperator):
             query += f" LIMIT {self._limit_clause}"
 
         return query
-    

@@ -1,0 +1,27 @@
+# -------- POSTGRES API --------
+POSTGRES_USER_API=your_user
+POSTGRES_PASSWORD_API=your_password
+POSTGRES_DB_API=your_db
+POSTGRES_API_HOST_PORT=15432
+
+# -------- PGADMIN --------
+PGADMIN_DEFAULT_EMAIL=admin@example.com
+PGADMIN_DEFAULT_PASSWORD=your_password
+PGADMIN_PORT=5050
+
+# -------- MLFlow --------
+MLFLOW_PORT=5000
+
+# -------- API --------
+API_SECRET_KEY=  # résultat de : openssl rand -hex 32
+API_ADMIN_PASSWORD=ton_mot_de_passe_admin
+API_USER_PASSWORD=ton_mot_de_passe_user
+
+# Génération de la clé secrète pour Flask (si besoin)
+# openssl rand -hex 32
+
+# -------- GRAFANA --------
+GRAFANA_ADMIN_PASSWORD=mot_de_passe
+
+# -------- ALERT --------
+GMAIL_APP_PASSWORD=ton_mot_de_passe_app

@@ -13,6 +13,7 @@ from app.static.extract_weather import extract_daily_weather
 from app.tasks.Extract.API_extraction2 import API_extraction2
 from app.tasks.Transform.TechnicalInfo import TechnicalInfo
 from app.tasks.Load.Parquet_to_snapshot2 import Parquet_to_snapshot2
+from app.datasets import raw_weather_table, raw_scheduled_weather_table
 
 
 # Définition du DAG
@@ -24,15 +25,15 @@ DESCRIPTION = "Import des données météo de la veille et du jour courant depui
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'retries': 2,
-    'retry_delay': timedelta(seconds=5),
+    'retries': 6,
+    'retry_delay': timedelta(minutes=2),
 }
 
 with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule="0 8 * * *",
+    schedule="0 5,7,9,11,13,15,17,19 * * *",
     tags=["API", "WEATHER", "OPENMETEO", "IMPORT", "RAW"],
     catchup=False,
     max_active_runs=1,
@@ -54,7 +55,7 @@ with DAG(
     "LYS": {"lat": 45.7256, "lon": 5.0811},
     "NCE": {"lat": 43.6584, "lon": 7.2159},
     "TLS": {"lat": 43.6293, "lon": 1.3638},
-    "BOR": {"lat": 44.8283, "lon": -0.7156},
+    "BOD": {"lat": 44.8283, "lon": -0.7156},
     }
 
     # Groupe pour toutes les extractions
@@ -125,6 +126,7 @@ with DAG(
                     api_type="openmeteo",
                     input_parquet_file=f"task_add_technical_info_raw_{iata}",
                     database_conn_id="flight_dw_postgres",
+                    outlets=[raw_weather_table],
                     task_id=f"task_load_raw_{iata}_to_db",
             )
 
@@ -136,6 +138,7 @@ with DAG(
                     api_type="openmeteo",
                     input_parquet_file=f"task_add_technical_info_scheduled_{iata}",
                     database_conn_id="flight_dw_postgres",
+                    outlets=[raw_scheduled_weather_table],
                     task_id=f"task_load_scheduled_{iata}_to_db",
             )
 
