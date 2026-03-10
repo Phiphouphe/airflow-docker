@@ -31,7 +31,7 @@ EXPECTED_DAGS = [
 ]
 
 EXPECTED_CRON = "20 5,7,9,11,13,15,17,19 * * *"
-WEATHER_CRON = "0 5 * * *"
+WEATHER_CRON = "0 5,7,9,11,13,15,17,19 * * *"
 ML_TRAINING_CRON = "40 5 * * *"
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

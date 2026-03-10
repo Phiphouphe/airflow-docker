@@ -9,6 +9,9 @@ from app.auth import authenticate_user, create_access_token, require_user
 from app.models.schemas import TokenResponse
 from app.routes.flights import router as flights_router
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 
 logging.basicConfig(
@@ -25,6 +28,10 @@ app = FastAPI(
     description="API de prédiction de retards de vols basée sur les modèles MLflow.",
     version="1.0.0",
 )
+
+# ── Prometheus ────────────────────────────────────────────────────────────────
+
+Instrumentator().instrument(app).expose(app)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 

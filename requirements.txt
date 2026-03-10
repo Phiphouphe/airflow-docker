@@ -1,7 +1,7 @@
+pandas==2.1.4
+scikit-learn==1.4.0
 requests
 psycopg2-binary
-pandas
 pyarrow
-scikit-learn
-xgboost
-mlflow
+mlflow==2.12.1
+airflow-exporter

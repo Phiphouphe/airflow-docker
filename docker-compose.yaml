@@ -452,6 +452,42 @@ services:
       api:
         condition: service_healthy
     restart: always
+
+  # ---------------- PROMETHEUS & GRAFANA ----------------
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
+    ports:
+      - "9090:9090"
+    restart: always
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    ports:
+      - "3000:3000"
+
+  # ---------------- ALERTMANAGER ----------------
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    env_file:
+      - .env
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    restart: always
+    entrypoint: >
+      sh -c "sed 's/$${GMAIL_APP_PASSWORD}/'"$$GMAIL_APP_PASSWORD"'/g'
+      /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml &&
+      alertmanager --config.file=/tmp/alertmanager.yml"
   
 
 volumes:

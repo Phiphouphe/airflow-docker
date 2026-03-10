@@ -16,3 +16,12 @@ MLFLOW_PORT=5000
 API_SECRET_KEY=  # résultat de : openssl rand -hex 32
 API_ADMIN_PASSWORD=ton_mot_de_passe_admin
 API_USER_PASSWORD=ton_mot_de_passe_user
+
+# Génération de la clé secrète pour Flask (si besoin)
+# openssl rand -hex 32
+
+# -------- GRAFANA --------
+GRAFANA_ADMIN_PASSWORD=mot_de_passe
+
+# -------- ALERT --------
+GMAIL_APP_PASSWORD=ton_mot_de_passe_app

@@ -25,7 +25,7 @@ DESCRIPTION = "Import des données météo de la veille et du jour courant depui
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'retries': 5,
+    'retries': 6,
     'retry_delay': timedelta(minutes=2),
 }
 
@@ -33,7 +33,7 @@ with DAG(
     dag_id=DAG_ID,
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
-    schedule="0 5 * * *",
+    schedule="0 5,7,9,11,13,15,17,19 * * *",
     tags=["API", "WEATHER", "OPENMETEO", "IMPORT", "RAW"],
     catchup=False,
     max_active_runs=1,
