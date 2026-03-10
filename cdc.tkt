@@ -112,9 +112,9 @@ Next step :
 - OK : Relire les tests, les comprendre, faire attention à la date en dur (doit être dynamique pour injection passée)
 - OK : Comprendre le CI/CD
 - OK : Ajouter les GitHub Actions secrets
-- OK 1/2 : Tester CI puis CD manuellement
+- OK : Tester CI puis CD manuellement
 - GitHub Actions : Blue Green Deployment (pas nécessaire mais savoir l'expliquer)
-- Prometheus et Grafana
+- OK : Prometheus et Grafana
 - Refaire Power BI
 - PowerPoint
 - OK : Modifier la récup de la météo pour que analytics et ML DAGs se relancent toutes les 2h aussi. Donc modifier les tests aussi avec les schedules
