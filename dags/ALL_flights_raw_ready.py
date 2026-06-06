@@ -73,11 +73,13 @@ with DAG(
     tags=["FLIGHTS", "RAW", "SENTINEL"],
 ) as dag:
 
+    # Vérifie que les 5 villes ont bien été collectées dans les 2 dernières heures
     task_check_all_cities = ShortCircuitOperator(
         task_id="check_all_cities_ready",
         python_callable=check_all_cities_ready,
     )
 
+    # Si oui, on considère que les datasets globaux sont prêts
     task_all_cities_ready = EmptyOperator(
         task_id="all_cities_raw_ready",
         outlets=[

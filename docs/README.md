@@ -399,13 +399,6 @@ feature/xxx  ──┐
 
 ---
 
-## 📚 Documentation complémentaire
-- [Architecture Decision Records](docs/adr.md)
-- [Architecture détaillée](docs/architecture.md)
-- [Guide de déploiement](docs/deployment.md)
-
----
-
 ## 👤 Auteur
 
 **Philistine Serour** — Data Engineer  
