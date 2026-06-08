@@ -140,7 +140,7 @@ airflow-docker/
 ├── scripts/                # Scripts utilitaires
 ├── streamlit/              # Interface utilisateur Streamlit
 ├── tests/                  # 7 fichiers de tests (pytest)
-├── webhook/                # Service de déploiement (non configuré côté GitHub)
+├── webhook/                # Service d'auto-healing — redémarre FastAPI/Airflow sur alerte Prometheus
 ├── .env.example            # Template des variables d'environnement
 ├── docker-compose.yaml     # 18 services Docker
 ├── dockerfile              # Image Airflow custom
@@ -320,20 +320,21 @@ Les DAGs sont chaînés via des **Dataset triggers** (Airflow 2.4+).
 
 ## 📊 Monitoring
 
-Stack **Prometheus / Grafana / Alertmanager** :
+Stack **Prometheus / Grafana / Alertmanager / Webhook** :
 
 - **Prometheus** scrape les métriques toutes les 15 secondes depuis 4 sources : Airflow (`:8080/admin/metrics`), FastAPI (`:8000/metrics`), Pushgateway (`:9091`), Prometheus lui-même
 - **Pushgateway** : les DAGs ML poussent leurs métriques métier (durée d'exécution, nombre de prédictions, % retards prédits, temps d'inférence)
 - **Grafana** : dashboards de suivi en temps réel
-- **Alertmanager** : routage des alertes vers email Gmail avec `send_resolved: true`
+- **Alertmanager** : route les alertes simultanément vers email Gmail ET le service webhook
+- **Webhook (auto-healing)** : reçoit les alertes critiques et redémarre automatiquement les containers Docker concernés (FastAPI, Airflow) sans intervention manuelle
 
 ### Règles d'alerte
 
-| Alerte | Condition | Sévérité |
-|---|---|---|
-| `AirflowDown` | `up{job="airflow"} == 0` pendant 1 min | critical |
-| `DAGFailed` | `dag_last_status failed > 0` pendant 1 min | warning |
-| `FastAPIDown` | `up{job="fastapi"} == 0` pendant 1 min | critical |
+| Alerte | Condition | Sévérité | Action |
+|---|---|---|---|
+| `AirflowDown` | `up{job="airflow"} == 0` pendant 1 min | critical | Email + restart auto |
+| `DAGFailed` | `dag_last_status failed > 0` pendant 1 min | warning | Email uniquement |
+| `FastAPIDown` | `up{job="fastapi"} == 0` pendant 1 min | critical | Email + restart auto |
 
 ---
 
@@ -396,13 +397,6 @@ feature/xxx  ──┐
 | 3 | **Environnements dev / staging / prod** | Une VM dédiée par environnement pour valider avant de déployer en production |
 | 4 | **Modèle de régression** | Prédire le retard en minutes, pas seulement retard / pas retard |
 | 5 | **Blue / Green Deployment** | 2 VM en production + AWS ALB — bascule instantanée, zéro interruption de service |
-
----
-
-## 📚 Documentation complémentaire
-- [Architecture Decision Records](docs/adr.md)
-- [Architecture détaillée](docs/architecture.md)
-- [Guide de déploiement](docs/deployment.md)
 
 ---
 
