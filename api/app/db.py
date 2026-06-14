@@ -18,6 +18,7 @@ def get_database_url():
 def get_engine():
     return create_engine(get_database_url())
 
+
 engine = None
 SessionLocal = None
 
