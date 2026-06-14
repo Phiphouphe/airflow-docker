@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.datasets import Dataset
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 from sklearn.pipeline import Pipeline
@@ -42,7 +42,7 @@ with DAG(
     tags=["FLIGHTS","ML", "TRAINING", "RAW"],
     catchup=False,
     max_active_runs=1,
-    dagrun_timeout=timedelta(minutes=10),
+    dagrun_timeout=timedelta(minutes=20),
     description=DESCRIPTION,
     doc_md="""
             Entraînement de modèles ML sur les données brutes de vol de la veille (raw) depuis la table 'raw_flights' dans la base de données flight_dw.
@@ -76,7 +76,11 @@ with DAG(
         "XGBoost": Pipeline([
             ("preprocessor", preprocessor),
             ("classifier", XGBClassifier(use_label_encoder=False, eval_metric="logloss"))
-        ])
+        ]),
+        "GradientBoosting": Pipeline([
+        ("preprocessor", preprocessor),
+        ("classifier", GradientBoostingClassifier(n_estimators=100, random_state=42))
+        ]),
     }
 
     task_extract_db = DB_extraction(
