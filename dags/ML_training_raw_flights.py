@@ -53,7 +53,6 @@ with DAG(
     features = [
         "origin_airport", "destination_airport", "departure_time_block",
         "day_of_week", "month", "dep_hour", "arr_hour", "is_cancelled",
-         # Nouvelles features météo
         "precipitation_sum",
         "wind_speed_max",
         "wind_gusts_max",
