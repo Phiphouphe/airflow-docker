@@ -86,8 +86,8 @@ with DAG(
             ("classifier", XGBClassifier(use_label_encoder=False, eval_metric="logloss"))
         ]),
         "GradientBoosting": Pipeline([
-        ("preprocessor", preprocessor),
-        ("classifier", GradientBoostingClassifier(n_estimators=100, random_state=42))
+            ("preprocessor", preprocessor),
+            ("classifier", GradientBoostingClassifier(n_estimators=100, random_state=42))
         ]),
     }
 
