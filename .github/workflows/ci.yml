@@ -84,7 +84,7 @@ jobs:
             mlflow \
             apache-airflow==2.9.0 \
             pandas numpy \
-            fastapi httpx \
+            "fastapi==0.110.0" "starlette==0.36.3" httpx \
             "python-jose[cryptography]" "passlib[bcrypt]" \
             "bcrypt==4.0.1" \
             python-multipart python-dotenv \

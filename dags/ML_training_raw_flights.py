@@ -52,10 +52,18 @@ with DAG(
     # Features 
     features = [
         "origin_airport", "destination_airport", "departure_time_block",
-        "day_of_week", "month", "dep_hour", "arr_hour", "is_cancelled"
+        "day_of_week", "month", "dep_hour", "arr_hour", "is_cancelled",
+         # Nouvelles features météo
+        "precipitation_sum",
+        "wind_speed_max",
+        "wind_gusts_max",
+        "weather_code",
+        "temp_min",
     ]
-    categorical_features = ["origin_airport", "destination_airport", "departure_time_block"]
-    numeric_features = ["day_of_week", "month", "dep_hour", "arr_hour"]
+    categorical_features = ["origin_airport", "destination_airport", "departure_time_block", "weather_code"]
+    numeric_features = ["day_of_week", "month", "dep_hour", "arr_hour",
+                        "precipitation_sum", "wind_speed_max", "wind_gusts_max", "temp_min"
+                    ]
 
     # Preprocessor pour les modèles ML
     preprocessor = ColumnTransformer([
