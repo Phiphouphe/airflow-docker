@@ -194,6 +194,7 @@ class MLPredictTask(PythonOperator):
                             ON CONFLICT (flight_number, flight_date)
                             DO UPDATE SET
                                 flight_number = EXCLUDED.flight_number,
+                                dep_hour = EXCLUDED.dep_hour,
                                 is_delayed = EXCLUDED.is_delayed,
                                 prediction_date = EXCLUDED.prediction_date,
                                 run_id = EXCLUDED.run_id,
