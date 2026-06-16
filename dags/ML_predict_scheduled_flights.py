@@ -140,7 +140,6 @@ with DAG(
             "dep_hour",
             "arr_hour",
             "is_cancelled",
-            "status",
             "precipitation_sum",
             "wind_speed_max",
             "wind_gusts_max",

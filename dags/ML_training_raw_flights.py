@@ -51,7 +51,7 @@ with DAG(
     
     # Features 
     features = [
-        "origin_airport", "destination_airport", "departure_time_block", "status",
+        "origin_airport", "destination_airport", "departure_time_block",
         "day_of_week", "month", "dep_hour", "arr_hour", "is_cancelled",
         "precipitation_sum",
         "wind_speed_max",
@@ -59,7 +59,7 @@ with DAG(
         "weather_code",
         "temp_min",
     ]
-    categorical_features = ["origin_airport", "destination_airport", "departure_time_block", "status", "weather_code"]
+    categorical_features = ["origin_airport", "destination_airport", "departure_time_block", "weather_code"]
     numeric_features = ["day_of_week", "month", "dep_hour", "arr_hour",
                         "precipitation_sum", "wind_speed_max", "wind_gusts_max", "temp_min"
                     ]
