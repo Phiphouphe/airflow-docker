@@ -139,7 +139,13 @@ with DAG(
             "month",
             "dep_hour",
             "arr_hour",
-            "is_cancelled"
+            "is_cancelled",
+            "status",
+            "precipitation_sum",
+            "wind_speed_max",
+            "wind_gusts_max",
+            "weather_code",
+            "temp_min",
         ],
         task_id="task_predict_ml",
     )
