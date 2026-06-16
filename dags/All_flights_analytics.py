@@ -339,7 +339,11 @@ with DAG(
             try:
                 if pd.isna(row["scheduled_departure"]):
                     return None
-                return pd.to_datetime(row["scheduled_departure"]).hour
+                dt = pd.to_datetime(row["scheduled_departure"])
+                # Convertir UTC → Europe/Paris
+                if dt.tzinfo is not None:
+                    dt = dt.tz_convert("Europe/Paris")
+                return dt.hour
             except Exception as e:
                 logging.warning(f"Erreur compute_dep_hour pour row {row.name}: {e}")
                 return None
@@ -348,7 +352,11 @@ with DAG(
             try:
                 if pd.isna(row["scheduled_arrival"]):
                     return None
-                return pd.to_datetime(row["scheduled_arrival"]).hour
+                dt = pd.to_datetime(row["scheduled_arrival"])
+                # Convertir UTC → Europe/Paris
+                if dt.tzinfo is not None:
+                    dt = dt.tz_convert("Europe/Paris")
+                return dt.hour
             except Exception as e:
                 logging.warning(f"Erreur compute_arr_hour pour row {row.name}: {e}")
                 return None
@@ -401,10 +409,15 @@ with DAG(
                 ),
                 "departure_time_block": lambda row: (
                     None if pd.isna(row["scheduled_departure"])
-                    else "night" if 0 <= row["scheduled_departure"].hour < 6
-                    else "morning" if 6 <= row["scheduled_departure"].hour < 12
-                    else "afternoon" if 12 <= row["scheduled_departure"].hour < 18
-                    else "evening"
+                    else (
+                        lambda h: 
+                        "night" if 0 <= h < 6
+                        else "morning" if 6 <= h < 12
+                        else "afternoon" if 12 <= h < 18
+                        else "evening"
+                    )(pd.to_datetime(row["scheduled_departure"]).tz_convert("Europe/Paris").hour 
+                    if pd.to_datetime(row["scheduled_departure"]).tzinfo is not None 
+                    else pd.to_datetime(row["scheduled_departure"]).hour)
                 ),
                 "is_delayed": lambda row: (
                     pd.notna(row["delay_minutes"]) and row["delay_minutes"] > 15
@@ -430,10 +443,15 @@ with DAG(
                 "month_name": compute_month_name,
                 "departure_time_block": lambda row: (
                     None if pd.isna(row["scheduled_departure"])
-                    else "night" if 0 <= row["scheduled_departure"].hour < 6
-                    else "morning" if 6 <= row["scheduled_departure"].hour < 12
-                    else "afternoon" if 12 <= row["scheduled_departure"].hour < 18
-                    else "evening"
+                    else (
+                        lambda h:
+                        "night" if 0 <= h < 6
+                        else "morning" if 6 <= h < 12
+                        else "afternoon" if 12 <= h < 18
+                        else "evening"
+                    )(pd.to_datetime(row["scheduled_departure"]).tz_convert("Europe/Paris").hour
+                    if pd.to_datetime(row["scheduled_departure"]).tzinfo is not None
+                    else pd.to_datetime(row["scheduled_departure"]).hour)
                 ),
                 "is_cancelled": lambda row: row["status"] == "CANCELLED",
             },
