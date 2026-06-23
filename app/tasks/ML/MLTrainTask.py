@@ -10,6 +10,7 @@ from datetime import timedelta, datetime
 from airflow.exceptions import AirflowFailException
 from airflow.providers.standard.operators.python import PythonOperator
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import recall_score, precision_score, f1_score
 from mlflow.tracking import MlflowClient
 
 class MLTrainTask(PythonOperator):
@@ -92,7 +93,11 @@ class MLTrainTask(PythonOperator):
                     logging.info(f"Entraînement du modèle {name}...")
                     model.fit(X_train, y_train)
                     score = model.score(X_test, y_test)
-                    logging.info(f"📊 {name} score: {score:.4f}")
+                    y_pred = model.predict(X_test)
+                    recall = recall_score(y_test, y_pred)
+                    precision = precision_score(y_test, y_pred)
+                    f1 = f1_score(y_test, y_pred)
+                    logging.info(f"📊 {name} accuracy: {score:.4f} | recall: {recall:.4f} | precision: {precision:.4f} | f1: {f1:.4f}")
 
                     artifact_path = f"{name.lower()}_flight_delay"
                     with mlflow.start_run(run_name=f"{name}_run") as run:
@@ -101,6 +106,9 @@ class MLTrainTask(PythonOperator):
                         mlflow.log_param("target", self._target)
                         mlflow.log_param("test_size", self._test_size)
                         mlflow.log_metric("test_accuracy", score)
+                        mlflow.log_metric("test_recall", recall)
+                        mlflow.log_metric("test_precision", precision)
+                        mlflow.log_metric("test_f1", f1)
                         mlflow.sklearn.log_model(model, artifact_path)
                         run_id = run.info.run_id
 
