@@ -152,28 +152,39 @@ def compute_delay_minutes(row):
 
 def update_predicted_labels():
     """Rapproche les prédictions ML des vols réels pour remplir is_delayed_predicted dans analytics.raw_flights."""
-
-    conn_config = BaseHook.get_connection("flight_dw_postgres")
-    conn = psycopg2.connect(
-        host=conn_config.host,
-        port=conn_config.port,
-        dbname=conn_config.schema,
-        user=conn_config.login,
-        password=conn_config.password,
-    )
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE analytics.raw_flights r
-        SET is_delayed_predicted = p.is_delayed
-        FROM ml.flight_predictions p
-        WHERE r.flight_number = p.flight_number
-        AND r.date = p.flight_date
-        AND r.origin_airport = p.origin_airport
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
-    logging.info("✅ is_delayed_predicted mis à jour depuis ml.flight_predictions dans analytics.raw_flights")
+    conn = None
+    cursor = None
+    try:
+        conn_config = BaseHook.get_connection("flight_dw_postgres")
+        conn = psycopg2.connect(
+            host=conn_config.host,
+            port=conn_config.port,
+            dbname=conn_config.schema,
+            user=conn_config.login,
+            password=conn_config.password,
+        )
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE analytics.raw_flights r
+            SET is_delayed_predicted = p.is_delayed
+            FROM ml.flight_predictions p
+            WHERE r.flight_number = p.flight_number
+            AND r.date = p.flight_date
+            AND r.origin_airport = p.origin_airport
+        """)
+        rows_updated = cursor.rowcount
+        conn.commit()
+        logging.info(f"✅ is_delayed_predicted mis à jour : {rows_updated} lignes modifiées dans analytics.raw_flights")
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logging.error(f"❌ Erreur lors de la mise à jour de is_delayed_predicted : {e}")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 with DAG(
