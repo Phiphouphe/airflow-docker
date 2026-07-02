@@ -2,7 +2,7 @@ import sys
 import os
 import pendulum
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import ShortCircuitOperator
 from airflow.datasets import Dataset
@@ -27,14 +27,13 @@ default_args = {
 
 
 def check_predict_ready():
-    import psycopg2
-    from airflow.hooks.base import BaseHook
-    from datetime import datetime, timedelta
 
     conn_config = BaseHook.get_connection("flight_dw_postgres")
     conn = psycopg2.connect(
-        host=conn_config.host, port=conn_config.port,
-        dbname=conn_config.schema, user=conn_config.login,
+        host=conn_config.host, 
+        port=conn_config.port,
+        dbname=conn_config.schema, 
+        user=conn_config.login,
         password=conn_config.password,
     )
 
@@ -139,10 +138,16 @@ with DAG(
             "month",
             "dep_hour",
             "arr_hour",
-            "is_cancelled"
+            "is_cancelled",
+            "precipitation_sum",
+            "wind_speed_max",
+            "wind_gusts_max",
+            "weather_code",
+            "temp_min",
         ],
         task_id="task_predict_ml",
     )
+
 
     # Définition des dépendances
     task_check_predict_ready >> task_extract_db >> task_predict_ml
