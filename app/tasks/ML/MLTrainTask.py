@@ -116,7 +116,7 @@ class MLTrainTask(PythonOperator):
 
                     results.append({
                         "model_name": name,
-                        "score": score,
+                        "F1-score": f1,
                         "model_object": model,
                         "run_id": run_id,
                         "artifact_path": artifact_path
@@ -130,10 +130,10 @@ class MLTrainTask(PythonOperator):
                 raise AirflowFailException(f"Erreur MLTrainTask {self.task_id}: Aucun modèle n'a pu être entraîné.")
 
             # Sélection du meilleur modèle
-            best = max(results, key=lambda x: x["score"])
+            best = max(results, key=lambda x: x["f1"])
 
             logging.info(f"\n{'='*50}")
-            logging.info(f"🏆 Meilleur modèle sélectionné : {best['model_name']} (score: {best['score']:.4f})")
+            logging.info(f"🏆 Meilleur modèle sélectionné : {best['model_name']} (f1-score: {best['f1']:.4f})")
             logging.info(f"Registering model from: runs:/{best['run_id']}/{best['artifact_path']}")
             logging.info(f"Model name: {self._model_registry_name}")
 
@@ -142,32 +142,32 @@ class MLTrainTask(PythonOperator):
 
             # Ajout des tags
             client.set_model_version_tag(self._model_registry_name, mv.version, "model_type", best["model_name"])
-            client.set_model_version_tag(self._model_registry_name, mv.version, "test_accuracy", str(round(best["score"], 4)))
+            client.set_model_version_tag(self._model_registry_name, mv.version, "test_f1", str(round(best["f1"], 4)))
             client.set_model_version_tag(self._model_registry_name, mv.version, "trained_at", datetime.now().strftime("%Y-%m-%d %H:%M"))
             client.set_model_version_tag(self._model_registry_name, mv.version, "features", str(self._features))
             client.set_model_version_tag(self._model_registry_name, mv.version, "dag_id", self.dag.dag_id)
 
             # Vérification du seuil minimum
-            if best["score"] < self._staging_threshold:
+            if best["f1"] < self._staging_threshold:
                 client.transition_model_version_stage(
                     name=self._model_registry_name,
                     version=mv.version,
                     stage="Archived",
                 )
                 logging.warning(
-                    f"⚠️ Score {best['score']:.4f} sous le seuil {self._staging_threshold}. "
+                    f"⚠️ F1-score {best['f1']:.4f} sous le seuil {self._staging_threshold}. "
                     f"Modèle archivé directement."
                 )
                 return {
                     "model_name": best["model_name"],
-                    "score": best["score"],
+                    "F1-score": best["f1"],
                     "model_version": mv.version,
                     "stage": "Archived"
                 }
 
-            # 1. Récupérer le score de Production AVANT de toucher à quoi que ce soit
+            # 1. Récupérer le f1-score de Production AVANT de toucher à quoi que ce soit
             best_production_score = self._get_best_production_score(client, self._model_registry_name)
-            logging.info(f"🏆 Meilleur score en Production actuel : {best_production_score:.4f}")
+            logging.info(f"🏆 Meilleur f1-score en Production actuel : {best_production_score:.4f}")
 
             # 2. Archiver Staging et None uniquement (Production protégée)
             self._archive_old_versions(client, self._model_registry_name, mv.version)
@@ -178,10 +178,10 @@ class MLTrainTask(PythonOperator):
                 version=mv.version,
                 stage="Staging",
             )
-            logging.info(f"📋 Version {mv.version} ({best['model_name']}) passée en Staging avec score {best['score']:.4f}")
+            logging.info(f"📋 Version {mv.version} ({best['model_name']}) passée en Staging avec f1-score {best['f1']:.4f}")
 
             # 4. Comparer et décider
-            if best["score"] > best_production_score:
+            if best["f1"] > best_production_score:
                 # Archiver l'ancien modèle en Production seulement maintenant
                 self._archive_production(client, self._model_registry_name, mv.version)
                 client.transition_model_version_stage(
@@ -189,18 +189,18 @@ class MLTrainTask(PythonOperator):
                     version=mv.version,
                     stage="Production",
                 )
-                logging.info(f"🚀 Version {mv.version} ({best['model_name']}) passée en Production (score: {best['score']:.4f} > {best_production_score:.4f})")
+                logging.info(f"🚀 Version {mv.version} ({best['model_name']}) passée en Production (f1-score: {best['f1']:.4f} > {best_production_score:.4f})")
                 stage = "Production"
             else:
                 logging.info(
                     f"📋 Version {mv.version} reste en Staging. "
-                    f"Score {best['score']:.4f} n'améliore pas la Production ({best_production_score:.4f})"
+                    f"F1-score {best['f1']:.4f} n'améliore pas la Production ({best_production_score:.4f})"
                 )
                 stage = "Staging"
 
             return {
                 "model_name": best["model_name"],
-                "score": best["score"],
+                "F1-score": best["f1"],
                 "model_version": mv.version,
                 "stage": stage
             }
@@ -211,7 +211,7 @@ class MLTrainTask(PythonOperator):
             raise AirflowFailException(f"Erreur MLTrainTask {self.task_id}: {e}")
 
     def _get_best_production_score(self, client: MlflowClient, model_name: str) -> float:
-        """Retourne le meilleur score parmi les modèles actuellement en Production.
+        """Retourne le meilleur f1-score parmi les modèles actuellement en Production.
         Si aucun modèle en Production ou si erreur, retourne 0.0."""
         try:
             versions = client.get_latest_versions(model_name, stages=["Production"])

@@ -152,6 +152,7 @@ with DAG(
         features=features,
         target="is_delayed",
         models=models_dict,
+        staging_threshold=0.4,
         task_id="task_training_models_ml",
         outlets=[ml_model_dataset],
     )
