@@ -151,7 +151,7 @@ def compute_delay_minutes(row):
             return None
 
 def update_predicted_labels():
-    """Rapproche les prédictions ML des vols réels pour remplir is_delayed_predicted dans analytics.raw_flights."""
+    """Rapproche les prédictions ML des vols réels pour remplir is_delayed_predicted."""
     conn = None
     cursor = None
     try:
@@ -164,6 +164,13 @@ def update_predicted_labels():
             password=conn_config.password,
         )
         cursor = conn.cursor()
+
+        # Garantit que la colonne existe même si la table a été recréée
+        cursor.execute("""
+            ALTER TABLE analytics.raw_flights 
+            ADD COLUMN IF NOT EXISTS is_delayed_predicted BOOLEAN;
+        """)
+
         cursor.execute("""
             UPDATE analytics.raw_flights r
             SET is_delayed_predicted = p.is_delayed
@@ -174,7 +181,7 @@ def update_predicted_labels():
         """)
         rows_updated = cursor.rowcount
         conn.commit()
-        logging.info(f"✅ is_delayed_predicted mis à jour : {rows_updated} lignes modifiées dans analytics.raw_flights")
+        logging.info(f"✅ is_delayed_predicted mis à jour : {rows_updated} lignes modifiées")
     except Exception as e:
         if conn:
             conn.rollback()

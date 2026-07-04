@@ -116,7 +116,7 @@ class MLTrainTask(PythonOperator):
 
                     results.append({
                         "model_name": name,
-                        "F1-score": f1,
+                        "f1": f1,
                         "model_object": model,
                         "run_id": run_id,
                         "artifact_path": artifact_path

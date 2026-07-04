@@ -1,17 +1,19 @@
 import sys
 import os
 import pendulum
+import psycopg2
 
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import ShortCircuitOperator
 from airflow.datasets import Dataset
+from airflow.hooks.base import BaseHook
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.ML.MLPredictTask import MLPredictTask
-from app.datasets import ana_scheduled_flights_table
+from app.datasets import ana_scheduled_flights_table, ml_predictions_table
 
 
 DAG_ID = "ML_predict_scheduled_flights"
@@ -145,6 +147,7 @@ with DAG(
             "weather_code",
             "temp_min",
         ],
+        outlets=[ml_predictions_table],   # quand task_predict_ml se termine, il produit un dataset
         task_id="task_predict_ml",
     )
 
