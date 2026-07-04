@@ -90,7 +90,7 @@ def compute_day_of_week(row):
             return None
         day_num = pd.to_datetime(row["date"]).dayofweek
         return day_num + 1
-            except Exception as e:
+    except Exception as e:
         logging.warning(f"Erreur compute_day_of_week_one_index pour row {row.name}: {e}")
         return None
 
@@ -99,7 +99,7 @@ def compute_month(row):
         if pd.isna(row["date"]):
             return None
         return pd.to_datetime(row["date"]).month
-            except Exception as e:
+    except Exception as e:
         logging.warning(f"Erreur compute_month pour row {row.name}: {e}")
         return None
 
@@ -108,7 +108,7 @@ def compute_dep_hour(row):
         if pd.isna(row["scheduled_departure"]):
             return None
         return pd.to_datetime(row["scheduled_departure"]).hour
-            except Exception as e:
+    except Exception as e:
         logging.warning(f"Erreur compute_dep_hour pour row {row.name}: {e}")
         return None
 
@@ -117,7 +117,7 @@ def compute_arr_hour(row):
         if pd.isna(row["scheduled_arrival"]):
             return None
         return pd.to_datetime(row["scheduled_arrival"]).hour
-            except Exception as e:
+    except Exception as e:
         logging.warning(f"Erreur compute_arr_hour pour row {row.name}: {e}")
         return None
 
@@ -127,7 +127,7 @@ def compute_day_name(row):
             return None
         day_num = pd.to_datetime(row["date"]).dayofweek
         return calendar.day_name[day_num]
-            except Exception as e:
+    except Exception as e:
         logging.warning(f"Erreur compute_day_name pour row {row.name}: {e}")
         return None
 
@@ -137,7 +137,7 @@ def compute_month_name(row):
             return None
         month_num = pd.to_datetime(row["date"]).month
         return calendar.month_name[month_num]
-            except Exception as e:
+    except Exception as e:
         logging.warning(f"Erreur compute_month_name pour row {row.name}: {e}")
         return None
 
@@ -147,7 +147,7 @@ def compute_delay_minutes(row):
                 pd.notna(row["scheduled_arrival"]) and
                 row["status"] != "CANCELLED"
             ):
-        return (row["actual_arrival"] - row["scheduled_arrival"]).total_seconds() / 60
+                return (row["actual_arrival"] - row["scheduled_arrival"]).total_seconds() / 60
             return None
 
 def update_predicted_labels():
