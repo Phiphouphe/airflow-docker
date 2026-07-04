@@ -3,6 +3,7 @@ import time
 import pandas as pd
 
 import mlflow
+
 from mlflow.tracking import MlflowClient
 from sqlalchemy import text
 
@@ -147,7 +148,7 @@ class MLPredictTask(PythonOperator):
                 pred_db = df[["flight_number", "date", "dep_hour", "origin_airport", "destination_airport",
                             "departure_time_block", "day_of_week", "month", "is_cancelled"]].copy()
                 pred_db["is_delayed"] = predictions
-                pred_db["prediction_date"] = pd.Timestamp.now()
+                pred_db["prediction_date"] = pd.Timestamp.now(tz="UTC")
                 pred_db["run_id"] = run_id
                 pred_db["model_name"] = model_name
                 pred_db["model_version"] = model_version
@@ -194,6 +195,7 @@ class MLPredictTask(PythonOperator):
                             ON CONFLICT (flight_number, flight_date)
                             DO UPDATE SET
                                 flight_number = EXCLUDED.flight_number,
+                                dep_hour = EXCLUDED.dep_hour,
                                 is_delayed = EXCLUDED.is_delayed,
                                 prediction_date = EXCLUDED.prediction_date,
                                 run_id = EXCLUDED.run_id,

@@ -61,3 +61,4 @@ ref_weather_codes_table     = Dataset("postgres://postgres_api/flight_dw/ref/wea
 #      (ML_training_raw_flights → ML_predict_scheduled_flights)
 # ===========================================================================
 ml_model_dataset            = Dataset("file:///mlflow/models/latest")
+ml_predictions_table        = Dataset("ml_predictions_table")
