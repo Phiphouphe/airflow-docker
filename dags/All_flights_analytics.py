@@ -142,13 +142,13 @@ def compute_month_name(row):
         return None
 
 def compute_delay_minutes(row):
-            if (
-                pd.notna(row["actual_arrival"]) and
-                pd.notna(row["scheduled_arrival"]) and
-                row["status"] != "CANCELLED"
-            ):
-                return (row["actual_arrival"] - row["scheduled_arrival"]).total_seconds() / 60
-            return None
+    if (
+        pd.notna(row["actual_arrival"]) and
+        pd.notna(row["scheduled_arrival"]) and
+        row["status"] != "CANCELLED"
+    ):
+        return (row["actual_arrival"] - row["scheduled_arrival"]).total_seconds() / 60
+    return None
 
 def update_predicted_labels():
     """Rapproche les prédictions ML des vols réels pour remplir is_delayed_predicted."""
