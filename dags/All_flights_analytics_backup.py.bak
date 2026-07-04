@@ -4,14 +4,12 @@ import os
 import pendulum
 import logging
 import calendar
-import psycopg2
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from airflow import DAG
-from airflow.operators.python import ShortCircuitOperator, PythonOperator
+from airflow.operators.python import ShortCircuitOperator
 from airflow.utils.task_group import TaskGroup
 from airflow.datasets import Dataset
-from airflow.hooks.base import BaseHook
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -39,13 +37,14 @@ default_args = {
 
 
 def check_analytics_ready():
+    import psycopg2
+    from airflow.hooks.base import BaseHook
+    from datetime import datetime, timedelta
 
     conn_config = BaseHook.get_connection("flight_dw_postgres")
     conn = psycopg2.connect(
-        host=conn_config.host, 
-        port=conn_config.port,
-        dbname=conn_config.schema, 
-        user=conn_config.login,
+        host=conn_config.host, port=conn_config.port,
+        dbname=conn_config.schema, user=conn_config.login,
         password=conn_config.password,
     )
 
@@ -83,115 +82,6 @@ def check_analytics_ready():
 
     print("✅ Vols et météo prêts pour analytics")
     return True
-
-def compute_day_of_week(row):
-    try:
-        if pd.isna(row["date"]):
-            return None
-        day_num = pd.to_datetime(row["date"]).dayofweek
-        return day_num + 1
-    except Exception as e:
-        logging.warning(f"Erreur compute_day_of_week_one_index pour row {row.name}: {e}")
-        return None
-
-def compute_month(row):
-    try:
-        if pd.isna(row["date"]):
-            return None
-        return pd.to_datetime(row["date"]).month
-    except Exception as e:
-        logging.warning(f"Erreur compute_month pour row {row.name}: {e}")
-        return None
-
-def compute_dep_hour(row):
-    try:
-        if pd.isna(row["scheduled_departure"]):
-            return None
-        return pd.to_datetime(row["scheduled_departure"]).hour
-    except Exception as e:
-        logging.warning(f"Erreur compute_dep_hour pour row {row.name}: {e}")
-        return None
-
-def compute_arr_hour(row):
-    try:
-        if pd.isna(row["scheduled_arrival"]):
-            return None
-        return pd.to_datetime(row["scheduled_arrival"]).hour
-    except Exception as e:
-        logging.warning(f"Erreur compute_arr_hour pour row {row.name}: {e}")
-        return None
-
-def compute_day_name(row):
-    try:
-        if pd.isna(row["date"]):
-            return None
-        day_num = pd.to_datetime(row["date"]).dayofweek
-        return calendar.day_name[day_num]
-    except Exception as e:
-        logging.warning(f"Erreur compute_day_name pour row {row.name}: {e}")
-        return None
-
-def compute_month_name(row):
-    try:
-        if pd.isna(row["date"]):
-            return None
-        month_num = pd.to_datetime(row["date"]).month
-        return calendar.month_name[month_num]
-    except Exception as e:
-        logging.warning(f"Erreur compute_month_name pour row {row.name}: {e}")
-        return None
-
-def compute_delay_minutes(row):
-    if (
-        pd.notna(row["actual_arrival"]) and
-        pd.notna(row["scheduled_arrival"]) and
-        row["status"] != "CANCELLED"
-    ):
-        return (row["actual_arrival"] - row["scheduled_arrival"]).total_seconds() / 60
-    return None
-
-def update_predicted_labels():
-    """Rapproche les prédictions ML des vols réels pour remplir is_delayed_predicted."""
-    conn = None
-    cursor = None
-    try:
-        conn_config = BaseHook.get_connection("flight_dw_postgres")
-        conn = psycopg2.connect(
-            host=conn_config.host,
-            port=conn_config.port,
-            dbname=conn_config.schema,
-            user=conn_config.login,
-            password=conn_config.password,
-        )
-        cursor = conn.cursor()
-
-        # Garantit que la colonne existe même si la table a été recréée
-        cursor.execute("""
-            ALTER TABLE analytics.raw_flights 
-            ADD COLUMN IF NOT EXISTS is_delayed_predicted BOOLEAN;
-        """)
-
-        cursor.execute("""
-            UPDATE analytics.raw_flights r
-            SET is_delayed_predicted = p.is_delayed
-            FROM ml.flight_predictions p
-            WHERE r.flight_number = p.flight_number
-            AND r.date = p.flight_date
-            AND r.origin_airport = p.origin_airport
-        """)
-        rows_updated = cursor.rowcount
-        conn.commit()
-        logging.info(f"✅ is_delayed_predicted mis à jour : {rows_updated} lignes modifiées")
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logging.error(f"❌ Erreur lors de la mise à jour de is_delayed_predicted : {e}")
-        raise
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
 
 
 with DAG(
@@ -426,6 +316,72 @@ with DAG(
 
     with TaskGroup('apply_business_functions') as apply_business_functions:
 
+        def compute_day_of_week(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                day_num = pd.to_datetime(row["date"]).dayofweek
+                return day_num + 1
+            except Exception as e:
+                logging.warning(f"Erreur compute_day_of_week_one_index pour row {row.name}: {e}")
+                return None
+
+        def compute_month(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                return pd.to_datetime(row["date"]).month
+            except Exception as e:
+                logging.warning(f"Erreur compute_month pour row {row.name}: {e}")
+                return None
+
+        def compute_dep_hour(row):
+            try:
+                if pd.isna(row["scheduled_departure"]):
+                    return None
+                return pd.to_datetime(row["scheduled_departure"]).hour
+            except Exception as e:
+                logging.warning(f"Erreur compute_dep_hour pour row {row.name}: {e}")
+                return None
+
+        def compute_arr_hour(row):
+            try:
+                if pd.isna(row["scheduled_arrival"]):
+                    return None
+                return pd.to_datetime(row["scheduled_arrival"]).hour
+            except Exception as e:
+                logging.warning(f"Erreur compute_arr_hour pour row {row.name}: {e}")
+                return None
+
+        def compute_day_name(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                day_num = pd.to_datetime(row["date"]).dayofweek
+                return calendar.day_name[day_num]
+            except Exception as e:
+                logging.warning(f"Erreur compute_day_name pour row {row.name}: {e}")
+                return None
+
+        def compute_month_name(row):
+            try:
+                if pd.isna(row["date"]):
+                    return None
+                month_num = pd.to_datetime(row["date"]).month
+                return calendar.month_name[month_num]
+            except Exception as e:
+                logging.warning(f"Erreur compute_month_name pour row {row.name}: {e}")
+                return None
+
+        def compute_delay_minutes(row):
+            if (
+                pd.notna(row["actual_arrival"]) and
+                pd.notna(row["scheduled_arrival"]) and
+                row["status"] != "CANCELLED"
+            ):
+                return (row["actual_arrival"] - row["scheduled_arrival"]).total_seconds() / 60
+            return None
+
         task_apply_functions_raw_flights = ApplyFunction(
             input_file="task_remove_columns_raw_flights",
             output_file="task_apply_functions_raw_flights",
@@ -445,15 +401,10 @@ with DAG(
                 ),
                 "departure_time_block": lambda row: (
                     None if pd.isna(row["scheduled_departure"])
-                    else (
-                        lambda h: 
-                        "night" if 0 <= h < 6
-                        else "morning" if 6 <= h < 12
-                        else "afternoon" if 12 <= h < 18
-                        else "evening"
-                    )(pd.to_datetime(row["scheduled_departure"]).tz_convert("Europe/Paris").hour 
-                    if pd.to_datetime(row["scheduled_departure"]).tzinfo is not None 
-                    else pd.to_datetime(row["scheduled_departure"]).hour)
+                    else "night" if 0 <= row["scheduled_departure"].hour < 6
+                    else "morning" if 6 <= row["scheduled_departure"].hour < 12
+                    else "afternoon" if 12 <= row["scheduled_departure"].hour < 18
+                    else "evening"
                 ),
                 "is_delayed": lambda row: (
                     pd.notna(row["delay_minutes"]) and row["delay_minutes"] > 15
@@ -479,15 +430,10 @@ with DAG(
                 "month_name": compute_month_name,
                 "departure_time_block": lambda row: (
                     None if pd.isna(row["scheduled_departure"])
-                    else (
-                        lambda h:
-                        "night" if 0 <= h < 6
-                        else "morning" if 6 <= h < 12
-                        else "afternoon" if 12 <= h < 18
-                        else "evening"
-                    )(pd.to_datetime(row["scheduled_departure"]).tz_convert("Europe/Paris").hour
-                    if pd.to_datetime(row["scheduled_departure"]).tzinfo is not None
-                    else pd.to_datetime(row["scheduled_departure"]).hour)
+                    else "night" if 0 <= row["scheduled_departure"].hour < 6
+                    else "morning" if 6 <= row["scheduled_departure"].hour < 12
+                    else "afternoon" if 12 <= row["scheduled_departure"].hour < 18
+                    else "evening"
                 ),
                 "is_cancelled": lambda row: row["status"] == "CANCELLED",
             },
@@ -540,10 +486,5 @@ with DAG(
 
         [task_load_raw_to_db, task_load_scheduled_to_db]
 
-    task_update_predicted_labels = PythonOperator(
-                task_id="task_update_predicted_labels",
-                python_callable=update_predicted_labels,
-            )
-
     # Définition des dépendances entre les tâches
-    task_check_analytics_ready >> extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> version_selector >> loading >> task_update_predicted_labels
+    task_check_analytics_ready >> extraction_db >> extractor_array >> [join_tables_raw, join_tables_scheduled] >> remove_columns >> apply_business_functions >> version_selector >> loading
