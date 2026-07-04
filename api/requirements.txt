@@ -1,4 +1,4 @@
-fastapi
+fastapi==0.110.0
 uvicorn
 sqlalchemy
 psycopg2-binary
@@ -8,4 +8,4 @@ bcrypt==4.0.1
 python-dotenv
 pydantic
 python-multipart
-prometheus-fastapi-instrumentator
+prometheus-fastapi-instrumentator==5.9.1

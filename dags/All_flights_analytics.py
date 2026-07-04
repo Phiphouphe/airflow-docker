@@ -445,10 +445,15 @@ with DAG(
                 ),
                 "departure_time_block": lambda row: (
                     None if pd.isna(row["scheduled_departure"])
-                    else "night" if 0 <= row["scheduled_departure"].hour < 6
-                    else "morning" if 6 <= row["scheduled_departure"].hour < 12
-                    else "afternoon" if 12 <= row["scheduled_departure"].hour < 18
-                    else "evening"
+                    else (
+                        lambda h: 
+                        "night" if 0 <= h < 6
+                        else "morning" if 6 <= h < 12
+                        else "afternoon" if 12 <= h < 18
+                        else "evening"
+                    )(pd.to_datetime(row["scheduled_departure"]).tz_convert("Europe/Paris").hour 
+                    if pd.to_datetime(row["scheduled_departure"]).tzinfo is not None 
+                    else pd.to_datetime(row["scheduled_departure"]).hour)
                 ),
                 "is_delayed": lambda row: (
                     pd.notna(row["delay_minutes"]) and row["delay_minutes"] > 15
@@ -474,10 +479,15 @@ with DAG(
                 "month_name": compute_month_name,
                 "departure_time_block": lambda row: (
                     None if pd.isna(row["scheduled_departure"])
-                    else "night" if 0 <= row["scheduled_departure"].hour < 6
-                    else "morning" if 6 <= row["scheduled_departure"].hour < 12
-                    else "afternoon" if 12 <= row["scheduled_departure"].hour < 18
-                    else "evening"
+                    else (
+                        lambda h:
+                        "night" if 0 <= h < 6
+                        else "morning" if 6 <= h < 12
+                        else "afternoon" if 12 <= h < 18
+                        else "evening"
+                    )(pd.to_datetime(row["scheduled_departure"]).tz_convert("Europe/Paris").hour
+                    if pd.to_datetime(row["scheduled_departure"]).tzinfo is not None
+                    else pd.to_datetime(row["scheduled_departure"]).hour)
                 ),
                 "is_cancelled": lambda row: row["status"] == "CANCELLED",
             },
