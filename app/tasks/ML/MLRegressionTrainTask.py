@@ -72,7 +72,7 @@ class MLRegressionTrainTask(PythonOperator):
             logging.info(f"✅ Fichier Parquet chargé : {len(df)} lignes")
 
             # ── Filtrage sur les vols en retard uniquement ────────────────────
-            df_delayed = df[df["is_delayed"] == True].copy()
+            df_delayed = df[df["is_delayed"]].copy()
             df_delayed = df_delayed.dropna(subset=[self._target])
             logging.info(f"📊 Vols en retard disponibles pour l'entraînement : {len(df_delayed)} lignes")
 
