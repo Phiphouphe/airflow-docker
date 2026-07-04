@@ -1,17 +1,19 @@
 import sys
 import os
 import pendulum
+import psycopg2
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import ShortCircuitOperator
 from airflow.datasets import Dataset
+from airflow.hooks.base import BaseHook
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.ML.MLPredictTask import MLPredictTask
-from app.datasets import ana_scheduled_flights_table
+from app.datasets import ana_scheduled_flights_table, ml_predictions_table
 
 
 DAG_ID = "ML_predict_scheduled_flights"
@@ -27,14 +29,13 @@ default_args = {
 
 
 def check_predict_ready():
-    import psycopg2
-    from airflow.hooks.base import BaseHook
-    from datetime import datetime, timedelta
 
     conn_config = BaseHook.get_connection("flight_dw_postgres")
     conn = psycopg2.connect(
-        host=conn_config.host, port=conn_config.port,
-        dbname=conn_config.schema, user=conn_config.login,
+        host=conn_config.host, 
+        port=conn_config.port,
+        dbname=conn_config.schema, 
+        user=conn_config.login,
         password=conn_config.password,
     )
 
@@ -139,10 +140,17 @@ with DAG(
             "month",
             "dep_hour",
             "arr_hour",
-            "is_cancelled"
+            "is_cancelled",
+            "precipitation_sum",
+            "wind_speed_max",
+            "wind_gusts_max",
+            "weather_code",
+            "temp_min",
         ],
+        outlets=[ml_predictions_table],   # quand task_predict_ml se termine, il produit un dataset
         task_id="task_predict_ml",
     )
+
 
     # Définition des dépendances
     task_check_predict_ready >> task_extract_db >> task_predict_ml
