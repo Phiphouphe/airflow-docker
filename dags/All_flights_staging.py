@@ -1,11 +1,13 @@
 import sys
 import os
 import pendulum
+import psycopg2
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import ShortCircuitOperator
 from airflow.utils.task_group import TaskGroup
+from airflow.hooks.base import BaseHook
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -30,9 +32,6 @@ default_args = {
 
 
 def check_staging_ready():
-    import psycopg2
-    from airflow.hooks.base import BaseHook
-    from datetime import datetime, timedelta
 
     conn_config = BaseHook.get_connection("flight_dw_postgres")
     conn = psycopg2.connect(
@@ -176,7 +175,7 @@ with DAG(
             key_columns=["flight_id", "flight_number", "date",
                          "origin_airport", "destination_airport"],
             keep="last",
-            null_threshold_percent=20,
+            null_threshold_percent=0,
             task_id="task_duplicate_remover_raw_flights",
         )
 
@@ -186,7 +185,7 @@ with DAG(
             key_columns=["flight_id", "flight_number", "date",
                          "origin_airport", "destination_airport"],
             keep="last",
-            null_threshold_percent=20,
+            null_threshold_percent=0,
             task_id="task_duplicate_remover_scheduled_flights",
         )
 
