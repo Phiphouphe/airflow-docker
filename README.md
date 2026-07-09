@@ -32,7 +32,7 @@ Le pipeline couvre l'ensemble du cycle de vie de la donnée :
 
 - **Ingestion** automatisée via Apache Airflow (schedules décalés de 15 min par aéroport pour respecter le rate limiting de l'API Air France)
 - **Transformation** en plusieurs couches PostgreSQL (raw → staging → analytics → ref → ml) selon le modèle en médaillon
-- **Entraînement** automatique de 3 modèles de classification (XGBoost, Logistic Regression, Random Forest) avec sélection du meilleur
+- **Entraînement** automatique de 4 modèles de classification (XGBoost, Logistic Regression, Random Forest, GradientBoosting) avec sélection du meilleur selon le F1-score
 - **Serving** via une API FastAPI + interface Streamlit
 - **Tracking** des expériences ML via MLflow (registry, versioning, promotion en production)
 - **Monitoring** via Prometheus, Grafana, Alertmanager et Pushgateway
@@ -91,7 +91,7 @@ Le pipeline couvre l'ensemble du cycle de vie de la donnée :
 |---|---|
 | **Orchestration** | Apache Airflow 3.0.6 · CeleryExecutor · Redis 7.2 |
 | **Base de données** | PostgreSQL 16 (×2 instances) · PGAdmin 4 |
-| **ML** | XGBoost · Logistic Regression · Random Forest · MLflow · Scikit-learn |
+| **ML** | XGBoost · Logistic Regression · Random Forest · GradientBoosting · MLflow · Scikit-learn |
 | **API** | FastAPI · Uvicorn |
 | **Interface** | Streamlit · Power BI |
 | **Monitoring** | Prometheus · Grafana · Alertmanager · Pushgateway |
@@ -115,7 +115,7 @@ airflow-docker/
 ├── app/                    # Logique applicative partagée (tasks, helpers)
 ├── config/
 │   └── airflow.cfg         # Configuration Airflow
-├── dags/                   # 15 DAGs Airflow
+├── dags/                   # 17 DAGs Airflow
 │   ├── API_BORDEAUX_flights_raw.py
 │   ├── API_LYON_flights_raw.py
 │   ├── API_MARSEILLE_flights_raw.py
@@ -128,6 +128,8 @@ airflow-docker/
 │   ├── All_flights_analytics.py
 │   ├── ML_training_raw_flights.py
 │   ├── ML_predict_scheduled_flights.py
+│   ├── ML_training_regression_raw_flights.py
+│   ├── ML_predict_regression_scheduled_flights.py
 │   ├── iata_reference_import.py
 │   ├── weather_codes_import.py
 │   └── github_kpis_dag.py
@@ -267,7 +269,7 @@ Le pipeline est organisé autour de **5 aéroports** avec des schedules décalé
 | Toulouse Blagnac | TLS | `45 6 * * *` |
 | Bordeaux Mérignac | BOD | `0 7 * * *` |
 
-### Les 15 DAGs
+### Les 17 DAGs
 
 | DAG | Rôle |
 |---|---|
@@ -277,8 +279,10 @@ Le pipeline est organisé autour de **5 aéroports** avec des schedules décalé
 | `All_flights_staging` | Nettoyage et typage |
 | `Cities_weather_staging` | Nettoyage météo |
 | `All_flights_analytics` | Enrichissement et agrégations |
-| `ML_training_raw_flights` | Entraînement des 3 modèles (5h40 quotidien) |
+| `ML_training_raw_flights` | Entraînement des 4 modèles (5h40 quotidien) |
 | `ML_predict_scheduled_flights` | Prédictions (trigger Data-Aware) |
+| `ML_training_regression_raw_flights` | Entraînement des 4 modèles régression, expérimental (5h50 quotidien) |
+| `ML_predict_regression_scheduled_flights` | Prédictions régression, expérimental (trigger Data-Aware) |
 | `iata_reference_import` | Chargement des codes IATA (unique) |
 | `weather_codes_import` | Chargement des codes météo (unique) |
 | `github_kpis_dag` | KPIs GitHub |
@@ -301,13 +305,13 @@ Les DAGs sont chaînés via des **Dataset triggers** (Airflow 2.4+).
 | `staging` | `staging_flights`, `staging_weather`, `scheduled_flights`, `scheduled_weather` | Données nettoyées et typées |
 | `analytics` | `raw_flights`, `scheduled_flights` | Données enrichies et agrégées |
 | `ref` | `iata_delay_codes`, `weather_codes` | Référentiels statiques |
-| `ml` | `flight_predictions` | Prédictions générées par le modèle |
+| `ml` | `flight_predictions` | Prédictions générées par le modèle (colonnes classification exposées + régression expérimentale non exposée) |
 
 ---
 
 ## 🤖 Modèle ML
 
-- **Algorithmes** : 3 modèles de classification entraînés à chaque cycle — XGBoost, Logistic Regression, Random Forest
+- **Algorithmes** : 4 modèles de classification entraînés à chaque cycle — XGBoost, Logistic Regression, Random Forest, GradientBoosting
 - **Sélection automatique** : le modèle avec le meilleur score est promu en Production dans MLflow
 - **Cible** : retard à l'arrivée > 15 minutes (1 = retard, 0 = ponctuel)
 - **Métrique** : F1-score (choisi pour gérer le déséquilibre des classes)
@@ -315,6 +319,10 @@ Les DAGs sont chaînés via des **Dataset triggers** (Airflow 2.4+).
 - **Entraînement** : MLTrainTask déclenché à 5h40 chaque matin sur `analytics.raw_flights`
 - **Inférence** : MLPredictTask déclenché par Dataset trigger sur `analytics.scheduled_flights` + ShortCircuitOperator (vérifie les 5 aéroports)
 - **Réentraînement continu** : les modèles sont réentraînés quotidiennement sur les données les plus récentes — mitigation native de la dérive des données
+
+Modèle de régression (expérimental) : en complément de la classification, un modèle de régression estimant la durée du retard en minutes a été développé et comparé sur les mêmes 4 algorithmes. Il n'est pas déployé en production : le meilleur modèle présente un écart moyen de plus de 22 minutes par rapport au retard réel. Les résultats sont stockés dans la même table flight_predictions, mais non exposés par l'API ni Streamlit.
+
+Évaluation en conditions réelles : le champ is_delayed_predicted est comparé le lendemain au statut réel du vol, une fois celui-ci connu, en complément des métriques calculées sur le jeu de test.
 
 ---
 
@@ -336,6 +344,7 @@ Stack **Prometheus / Grafana / Alertmanager / Webhook** :
 | `DAGFailed` | `dag_last_status failed > 0` pendant 1 min | warning | Email uniquement |
 | `FastAPIDown` | `up{job="fastapi"} == 0` pendant 1 min | critical | Email + restart auto |
 
+Pour 'DAGFailed', la résolution observée provient des retries natifs Airflow au niveau tâche (retries/retry_delay), indépendamment du webhook qui ne fait que logger cette alerte.
 ---
 
 ## ⚙️ CI/CD
@@ -348,7 +357,7 @@ Déclenché sur `feature_philistine`, `develop`, `main` :
 
 1. **Lint & qualité** : flake8, black, bandit
 2. **Tests unitaires** : pytest + coverage sur 7 fichiers de tests
-3. **DAG integrity tests** : validation de l'intégrité des 15 DAGs
+3. **DAG integrity tests** : validation de l'intégrité des 17 DAGs
 4. **Docker build check** : build des images API et Streamlit
 
 ### CD — déploiement manuel
@@ -385,6 +394,7 @@ feature/xxx  ──┐
 | EC2 single node | Pas de haute disponibilité — une panne de l'instance arrête l'ensemble du système |
 | Secrets en `.env` | En production réelle : AWS Secrets Manager ou HashiCorp Vault |
 | Volume de données limité | ~2 000 vols depuis mars 2026 — contraint par le rate limiting de l'API Air France |
+| Modèle de régression non déployé | Développé à titre expérimental mais écart moyen >22min vs retard réel — nécessite amélioration avant mise en production |
 
 ---
 
@@ -395,8 +405,7 @@ feature/xxx  ──┐
 | 1 | **Terraform** | Provisionner EC2, VPC, Security Groups, S3 en une commande — reproductibilité totale |
 | 2 | **Ansible** | Automatiser la configuration de l'EC2 après provisionnement (Docker, .env, services) |
 | 3 | **Environnements dev / staging / prod** | Une VM dédiée par environnement pour valider avant de déployer en production |
-| 4 | **Modèle de régression** | Prédire le retard en minutes, pas seulement retard / pas retard |
-| 5 | **Blue / Green Deployment** | 2 VM en production + AWS ALB — bascule instantanée, zéro interruption de service |
+| 4 | **Blue / Green Deployment** | 2 VM en production + AWS ALB — bascule instantanée, zéro interruption de service |
 
 ---
 

@@ -73,7 +73,7 @@ flowchart LR
     end
 
     subgraph RAW["raw"]
-        R1[raw_flights\nraw_scheduled]
+        R1[raw_flights\nscheduled_flights]
         R2[raw_weather\nscheduled_weather]
     end
 
@@ -95,12 +95,21 @@ flowchart LR
     subgraph ML_SCHEMA["ml"]
         ML1[Dataset entraînement\n— analytics.raw_flights]
         ML2[Dataset inférence\n— analytics.scheduled_flights]
-        ML3[flight_predictions]
+        ML3[flight_predictions\ncolonnes classification + régression]
     end
 
     subgraph MLFLOW_BOX["MLflow"]
-        EXP[Expériences & métriques\n3 modèles comparés]
-        MODEL[Meilleur modèle\nXGBoost / LogReg / RandomForest]
+        EXP[Expériences classification\n4 modèles comparés]
+        MODEL[Meilleur modèle\nXGBoost / LogReg / RandomForest / GradientBoosting]
+        PRED_MLFLOW[Prédictions générées\ndans MLflow]
+        EXP --> MODEL
+        MODEL -->|MLTrainTask termine\nData-Aware trigger| PRED_MLFLOW
+
+        EXP_REG[Expériences régression\n4 modèles comparés]
+        REG[Meilleur modèle régression\nexpérimental — non promu\nécart moyen >22min]
+        PRED_MLFLOW_REG[Prédictions régression\ngénérées dans MLflow]
+        EXP_REG --> REG
+        REG -->|MLTrainRegressionTask termine\nData-Aware trigger| PRED_MLFLOW_REG
     end
 
     subgraph SERVING_BOX["Serving"]
@@ -121,19 +130,21 @@ flowchart LR
     REF1 & REF2 --> A1
 
     A1 -->|MLTrainTask 5h40| EXP
-    EXP --> MODEL
-    MODEL -->|promu en Production| MLFLOW_BOX
+    A1 -->|MLTrainRegressionTask 5h50| EXP_REG
 
-    A2 -->|MLPredictTask Data-Aware| ML3
-    MODEL -->|charge modèle Production| ML3
+    A2 -->|données d'inférence| PRED_MLFLOW
+    A2 -->|données d'inférence| PRED_MLFLOW_REG
 
-    ML3 -->|flight_predictions| API2
+    PRED_MLFLOW -->|MLPredictTask\nrécupère + insère| ML3
+    PRED_MLFLOW_REG -->|MLPredictRegressionTask\nrécupère + insère| ML3
+
+    ML3 -->|colonne classification uniquement exposée| API2
     API2 --> UI
 ```
 
 ---
 
-## 3. Les 15 DAGs — chaîne d'orchestration
+## 3. Les 17 DAGs — chaîne d'orchestration
 
 ```mermaid
 flowchart TD
@@ -163,6 +174,8 @@ flowchart TD
     subgraph ML_DAGS["Machine Learning"]
         TRAIN[ML_training_raw_flights\n5h40 quotidien]
         PRED[ML_predict_scheduled_flights\nData-Aware trigger]
+        TRAIN_REG[ML_training_regression_raw_flights\n5h50 quotidien]
+        PRED_REG[ML_predict_regression_scheduled_flights\nData-Aware trigger]
     end
 
     subgraph UTILS["Utilitaires"]
@@ -172,7 +185,9 @@ flowchart TD
     NCE & LYS & MRS & TLS & BOD & WEA --> FANIN
     IATA & WCOD --> ANA
     FANIN --> STG --> ANA --> TRAIN
-    ANA --> PRED
+    FANIN --> STG --> ANA --> TRAIN_REG
+    TRAIN -->|Data-Aware trigger| PRED
+    TRAIN_REG -->|Data-Aware trigger| PRED_REG
 ```
 
 ---
@@ -181,8 +196,10 @@ flowchart TD
 
 | Alerte | Expression PromQL | Délai | Sévérité | Action |
 |---|---|---|---|---|
-| `AirflowDown` | `up{job="airflow"} == 0` | 1 min | critical | Email Gmail |
+| `AirflowDown` | `up{job="airflow"} == 0` | 1 min | critical | Email Gmail + restart auto (webhook) |
 | `DAGFailed` | `sum(airflow_dag_last_status{status="failed"}) > 0` | 1 min | warning | Email Gmail |
-| `FastAPIDown` | `up{job="fastapi"} == 0` | 1 min | critical | Email Gmail |
+| `FastAPIDown` | `up{job="fastapi"} == 0` | 1 min | critical | Email Gmail  + restart auto (webhook) |
 
 > `send_resolved: true` — une notification est envoyée aussi à la résolution de l'alerte.
+
+Pour 'DAGFailed', la résolution observée provient généralement des retries natifs Airflow au niveau tâche (paramètres retries / retry_delay définis dans les DAGs), qui relancent automatiquement la tâche en échec — indépendamment du webhook, qui ne fait que logger cette alerte sans action corrective.

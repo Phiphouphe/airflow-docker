@@ -1,13 +1,15 @@
 import pendulum
 import sys
 import os
+import psycopg2
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import ShortCircuitOperator
+from airflow.hooks.base import BaseHook
 
 from app.datasets import (
     raw_flights_nice_done, raw_flights_lyon_done,
@@ -21,9 +23,6 @@ from app.datasets import (
 
 
 def check_all_cities_ready():
-    import psycopg2
-    from airflow.hooks.base import BaseHook
-    from datetime import datetime, timedelta
 
     conn_config = BaseHook.get_connection("flight_dw_postgres")
     conn = psycopg2.connect(
