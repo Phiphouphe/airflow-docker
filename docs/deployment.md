@@ -24,7 +24,7 @@ GitHub (branches : feature/* → develop → main)
     │  ├── CI automatique (push / PR)
     │  │   ├── Lint & qualité (flake8, black, bandit)
     │  │   ├── Tests unitaires (pytest, 7 fichiers)
-    │  │   ├── DAG integrity tests (15 DAGs)
+    │  │   ├── DAG integrity tests (17 DAGs)
     │  │   └── Docker build check (API + Streamlit)
     │  │
     │  └── CD manuel (workflow_dispatch)
@@ -83,6 +83,7 @@ Depuis la console AWS :
 | 9093 | Alertmanager |
 | 15432 | PostgreSQL API |
 | 5050 | PGAdmin |
+| 9099 | Webhook (auto-healing) |
 
 ### 2. Installer Docker sur EC2
 
@@ -145,6 +146,7 @@ docker compose ps
 | MLflow | http://`<EC2_IP>`:5000 |
 | Grafana | http://`<EC2_IP>`:3000 |
 | PGAdmin | http://`<EC2_IP>`:5050 |
+| Webhook | http://<EC2_IP>:9099/webhook |
 
 > ⚠️ Changer les credentials par défaut Airflow (`airflow/airflow`) et Grafana avant toute exposition publique.
 
@@ -174,7 +176,7 @@ push / PR
     │   └── pytest tests/ --cov (coverage global)
     │
     ├── Job 3 : DAG Integrity Tests (nécessite Job 1)
-    │   └── pytest tests/test_dags.py (15 DAGs)
+    │   └── pytest tests/test_dags.py (17 DAGs)
     │
     └── Job 4 : Docker Build Check (nécessite Job 2)
         ├── docker build ./api

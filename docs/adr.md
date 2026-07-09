@@ -25,6 +25,8 @@ Mapping alertes → containers :
 | `FastAPIDown` | `flight_api` |
 | `DAGFailed` | aucun restart (warning uniquement) |
 
+Le webhook ne déclenche aucune action pour 'DAGFailed' : la résilience sur les échecs de tâche est assurée en amont par les retries Airflow (configuration retries/retry_delay au niveau des tâches), qui expliquent les résolutions d'alerte observées sans intervention du webhook.
+
 Le container webhook a accès au Docker socket de l'hôte (`/var/run/docker.sock`) pour piloter Docker directement.
 
 **Justification**

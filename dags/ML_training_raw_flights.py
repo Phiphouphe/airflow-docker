@@ -17,7 +17,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from app.tasks.Extract.DB_extraction import DB_extraction
 from app.tasks.ML.MLTrainTask import MLTrainTask
 from airflow.datasets import Dataset
-from app.datasets import ana_flights_table, ml_model_dataset
+from app.datasets import ml_model_dataset
 
 
 # Définition du DAG
@@ -38,7 +38,6 @@ with DAG(
     default_args=default_args,
     start_date=pendulum.datetime(2025, 1, 1, tz="Europe/Paris"),
     schedule="40 5 * * *",
-    # schedule=[ana_flights_table],
     tags=["FLIGHTS","ML", "TRAINING", "RAW"],
     catchup=False,
     max_active_runs=1,

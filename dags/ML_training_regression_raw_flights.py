@@ -63,7 +63,7 @@ with DAG(
         ],
         target="delay_minutes",
         test_size=0.2,
-        staging_threshold=25.0,
+        staging_threshold=30.0,
         task_id="task_training_regression_models",
     )
 
