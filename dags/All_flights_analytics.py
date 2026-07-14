@@ -107,7 +107,10 @@ def compute_dep_hour(row):
     try:
         if pd.isna(row["scheduled_departure"]):
             return None
-        return pd.to_datetime(row["scheduled_departure"]).hour
+        dt = pd.to_datetime(row["scheduled_departure"])
+        if dt.tzinfo is not None:
+            dt = dt.tz_convert("Europe/Paris")
+        return dt.hour
     except Exception as e:
         logging.warning(f"Erreur compute_dep_hour pour row {row.name}: {e}")
         return None
@@ -116,7 +119,10 @@ def compute_arr_hour(row):
     try:
         if pd.isna(row["scheduled_arrival"]):
             return None
-        return pd.to_datetime(row["scheduled_arrival"]).hour
+        dt = pd.to_datetime(row["scheduled_arrival"])
+        if dt.tzinfo is not None:
+            dt = dt.tz_convert("Europe/Paris")
+        return dt.hour
     except Exception as e:
         logging.warning(f"Erreur compute_arr_hour pour row {row.name}: {e}")
         return None
