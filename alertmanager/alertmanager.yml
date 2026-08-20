@@ -1,7 +1,7 @@
 global:
   smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'pserour@gmail.com'
-  smtp_auth_username: 'pserour@gmail.com'
+  smtp_from: 'xxxx@gmail.com'
+  smtp_auth_username: 'xxxx@gmail.com'
   smtp_auth_password: '${GMAIL_APP_PASSWORD}'
   smtp_require_tls: true
 
@@ -15,7 +15,7 @@ route:
 receivers:
   - name: 'email-webhook'
     email_configs:
-      - to: 'philistineserour@neuf.fr'
+      - to: 'dddd@gmail.com'
         send_resolved: true
     webhook_configs:
       - url: 'http://webhook:9099/webhook'
